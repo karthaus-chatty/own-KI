@@ -395,6 +395,9 @@
               {% if intents.unknown_count %}
                 Aktuell in den Logs: <strong>{{ intents.unknown_count }}</strong> Unknown-Intents
                 ({{ intents.unknown_percent|round(1) }}%), die nach <code>data/unknowns.csv</code> exportiert werden können.
+                <br />
+                Nach dem Export kannst du die Datei hier herunterladen:
+                <a href="/admin/download_unknowns">unknowns.csv herunterladen</a>
               {% else %}
                 In den Logs sind derzeit keine Unknown-Intents vorhanden.
               {% endif %}
@@ -650,8 +653,15 @@
           if (!res.ok || !data.ok) {
             trainStatus.textContent = "Fehler: " + (data.message || "Training fehlgeschlagen");
           } else {
-            trainStatus.textContent = data.message;
-          }
+            if (data.summary) {
+              const s = data.summary;
+              trainStatus.textContent =
+                data.message +
+                ` (Gesamt: ${s.total_after_dedup} Beispiele – Basis: ${s.base}, JSON: ${s.json}, Logs: ${s.logs}, Unknowns: ${s.unknowns})`;
+            } else {
+              trainStatus.textContent = data.message;
+            }
+}
         } catch (err) {
           console.error(err);
           trainStatus.textContent = "Netzwerkfehler beim Training.";

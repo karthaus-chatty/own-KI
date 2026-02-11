@@ -8,11 +8,12 @@
 #
 # Ergebnis:
 # - Neues Modell + Vectorizer werden in data/model.pkl / data/vectorizer.pkl gespeichert
+# - Es wird eine Summary mit Größen je Quelle zurückgegeben
 
 import os
 import csv
 import json
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 
 import joblib
 
@@ -22,8 +23,6 @@ from chatbot import (
     MODEL_FILE,
     VECTORIZER_FILE,
 )
-
-# Pfade
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -35,16 +34,6 @@ UNKNOWN_FILE = os.path.join(DATA_DIR, "unknowns.csv")
 
 
 def load_from_training_json() -> List[Tuple[str, str]]:
-    """
-    Lädt Trainingsdaten aus data/training_data.json, falls vorhanden.
-    Format:
-    {
-      "data": [
-        { "text": "...", "intent": "..." },
-        ...
-      ]
-    }
-    """
     if not os.path.exists(TRAINING_JSON):
         print("[train_from_logs] Keine training_data.json gefunden – nutze nur Basisdaten + Logs.")
         return []
@@ -68,14 +57,6 @@ def load_from_training_json() -> List[Tuple[str, str]]:
 
 
 def load_from_csv(path: str, source_name: str) -> List[Tuple[str, str]]:
-    """
-    Liest Trainingsdaten aus einer CSV-Datei im Schema:
-      [timestamp, user_text, bot_answer, intent, note]
-    und nimmt nur Zeilen, bei denen:
-      - user_text nicht leer ist
-      - intent vorhanden ist
-      - intent != 'unknown'
-    """
     if not os.path.exists(path):
         print(f"[train_from_logs] {source_name}: Datei {path} nicht gefunden.")
         return []
@@ -102,52 +83,56 @@ def load_from_csv(path: str, source_name: str) -> List[Tuple[str, str]]:
     return items
 
 
-def collect_all_training_data() -> List[Tuple[str, str]]:
-    """
-    Sammelt alle Trainingsdaten aus:
-    - chatbot.base_train_data
-    - training_data.json
-    - chatlog.csv
-    - unknowns.csv (z.B. manuell gelabelte Unknowns)
-    """
+def collect_all_training_data() -> tuple[List[Tuple[str, str]], Dict[str, Any]]:
     all_data: List[Tuple[str, str]] = []
 
     # 1) Basisdaten aus chatbot.py
-    print(f"[train_from_logs] Basisdaten aus chatbot.base_train_data: {len(base_train_data)}")
+    base_count = len(base_train_data)
+    print(f"[train_from_logs] Basisdaten aus chatbot.base_train_data: {base_count}")
     all_data.extend(base_train_data)
 
     # 2) training_data.json
     json_data = load_from_training_json()
+    json_count = len(json_data)
     all_data.extend(json_data)
 
     # 3) chatlog.csv
     log_data = load_from_csv(LOG_FILE, "chatlog.csv")
+    log_count = len(log_data)
     all_data.extend(log_data)
 
-    # 4) unknowns.csv (nur, wenn du dort Intents manuell gesetzt hast)
+    # 4) unknowns.csv
     unknown_data = load_from_csv(UNKNOWN_FILE, "unknowns.csv")
+    unknown_count = len(unknown_data)
     all_data.extend(unknown_data)
 
-    # Optional: einfache Dubletten-Entfernung (Text+Intent)
+    total_before = len(all_data)
+
+    # Dubletten entfernen (Text+Intent)
     unique = {}
     for text, intent in all_data:
         key = (text, intent)
         unique[key] = (text, intent)
 
     deduped = list(unique.values())
-    print(f"[train_from_logs] Gesamt vor Dubletten: {len(all_data)}, nach Dubletten: {len(deduped)}")
+    total_after = len(deduped)
 
-    return deduped
+    summary: Dict[str, Any] = {
+        "base": base_count,
+        "json": json_count,
+        "logs": log_count,
+        "unknowns": unknown_count,
+        "total_before_dedup": total_before,
+        "total_after_dedup": total_after,
+    }
+
+    print(f"[train_from_logs] Gesamt vor Dubletten: {total_before}, nach Dubletten: {total_after}")
+
+    return deduped, summary
 
 
 def train_model_from_all_data():
-    """
-    Hauptfunktion:
-    - sammelt alle Daten
-    - trainiert das Modell
-    - speichert model.pkl und vectorizer.pkl
-    """
-    train_data = collect_all_training_data()
+    train_data, summary = collect_all_training_data()
     if not train_data:
         raise RuntimeError("Keine Trainingsdaten gefunden – Training abgebrochen.")
 
@@ -161,8 +146,9 @@ def train_model_from_all_data():
     print(f"[train_from_logs] Modell gespeichert in: {MODEL_FILE}")
     print(f"[train_from_logs] Vectorizer gespeichert in: {VECTORIZER_FILE}")
 
+    return summary
+
 
 if __name__ == "__main__":
-    # Manuelles Training per:
-    #   python3 train_from_logs
-    train_model_from_all_data()
+    summary = train_model_from_all_data()
+    print("[train_from_logs] Summary:", summary)
