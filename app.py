@@ -26,6 +26,7 @@ from chatbot import (
     log_message,
     tweak_answer_with_context,
     debug_intent_analysis,
+    get_intent_example_counts,
 )
 from analyze_logs import (
     load_logs,
@@ -48,6 +49,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 TRAINING_JSON = os.path.join(DATA_DIR, "training_data.json")
+FEEDBACK_FILE = os.path.join(DATA_DIR, "feedback.csv")
 
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 
@@ -371,6 +373,7 @@ def admin_dashboard():
             top_overall=None,
             top_per_intent=None,
             recent_unknowns_list=[],
+            intent_health=[],
             username=username,
         )
 
@@ -382,6 +385,49 @@ def admin_dashboard():
     top_per_intent = top_words_per_intent(rows, top_n=10, min_count=2)
     recent_unknowns_list = recent_unknowns(rows, limit=20)
 
+    # === Intent-Health: Training- und Log-Zahlen zusammenführen ===
+    train_counts = get_intent_example_counts()
+    # Log-Zahlen aus compute_intent_stats.by_intent in ein Dict bringen
+    log_counts = {}
+    for item in intents["by_intent"]:
+        name = item["intent"]
+        log_counts[name] = item["count"]
+
+    all_intent_names = sorted(set(list(train_counts.keys()) + list(log_counts.keys())))
+
+    health = []
+    for name in all_intent_names:
+        if name == "unknown":
+            # Unknown ist kein "trainbarer" Intent
+            continue
+
+        t_count = int(train_counts.get(name, 0))
+        l_count = int(log_counts.get(name, 0))
+
+        # Status-Kategorien (kannst du nach Geschmack anpassen)
+        if t_count >= 20:
+            status = "good"
+            label = "stark trainiert"
+        elif t_count >= 5:
+            status = "medium"
+            label = "okay, aber ausbaubar"
+        elif t_count == 0 and l_count > 0:
+            status = "needs_training"
+            label = "in Logs, aber ohne Trainingsdaten"
+        else:
+            status = "low"
+            label = "wenig Trainingsdaten"
+
+        health.append(
+            {
+                "intent": name,
+                "train_count": t_count,
+                "log_count": l_count,
+                "status": status,
+                "status_label": label,
+            }
+        )
+
     return render_template(
         "admin.html",
         no_logs=False,
@@ -392,6 +438,7 @@ def admin_dashboard():
         top_overall=top_overall,
         top_per_intent=top_per_intent,
         recent_unknowns_list=recent_unknowns_list,
+        intent_health=health,
         username=username,
     )
 
@@ -501,6 +548,36 @@ def admin_annotate():
         }
     )
 
+@app.route("/api/feedback", methods=["POST"])
+def api_feedback():
+    """
+    Nimmt Feedback vom Frontend entgegen:
+    { "text": "...Bot-Antwort...", "intent": "ki_programming", "rating": "up"|"down" }
+    und loggt es in data/feedback.csv.
+    """
+    data = request.get_json() or {}
+    text = (data.get("text") or "").strip()
+    intent = (data.get("intent") or "").strip()
+    rating = (data.get("rating") or "").strip().lower()
+
+    if rating not in ("up", "down"):
+        return jsonify({"ok": False, "message": "Ungültiges Rating."}), 400
+
+    # Minimal-Logging, Intent/Text können leer sein – aber hilfreich, wenn vorhanden
+    from datetime import datetime
+
+    ts = datetime.utcnow().isoformat()
+    row = [ts, text, intent, rating]
+
+    try:
+        with open(FEEDBACK_FILE, "a", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(row)
+    except Exception as e:
+        print(f"[api_feedback] Konnte Feedback nicht schreiben: {e}")
+        return jsonify({"ok": False, "message": "Fehler beim Speichern des Feedbacks."}), 500
+
+    return jsonify({"ok": True})
 
 # ===============================
 # Main

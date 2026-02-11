@@ -235,6 +235,17 @@
       color: #fed7aa;
     }
 
+    .pill-health-good {
+      border-color: var(--accent-green);
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    .pill-health-low,
+    .pill-health-needs_training {
+      border-color: var(--accent-red);
+      background: rgba(248, 113, 113, 0.08);
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -498,8 +509,8 @@
                 </tbody>
               </table>
               <p class="small-muted" style="margin-top:6px;">
-                Tipp: Mehrere Unknowns mit demselben Intent beschriften (z.B. <code>feelings</code>, <code>work_situation</code>,
-                <code>python_help</code>) und danach <strong>„Modell neu trainieren“</strong> ausführen.
+                Tipp: Mehrere Unknowns mit demselben Intent beschriften und danach
+                <strong>„Modell neu trainieren“</strong> ausführen.
               </p>
             {% else %}
               <p class="small-muted">
@@ -558,11 +569,63 @@
                 Intent testen
               </button>
               <span class="small-muted">
-                Zeigt dir den erkannten Intent, Confidence und die Top-Alternativen.
+                Zeigt dir Intent, Confidence, Trainingsbeispiele & Alternativen.
               </span>
             </div>
             <div id="debug-intent-result" class="small-muted" style="margin-top:8px;"></div>
           </div>
+        </div>
+
+        <!-- Intent-Health -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Intent-Health</div>
+              <div class="card-subtitle">
+                Trainingsbeispiele vs. Nutzung in Logs
+              </div>
+            </div>
+          </div>
+          {% if intent_health and intent_health|length > 0 %}
+            <table>
+              <thead>
+                <tr>
+                  <th>Intent</th>
+                  <th>Trainingsdaten</th>
+                  <th>in Logs</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for h in intent_health %}
+                <tr>
+                  <td>{{ h.intent }}</td>
+                  <td>{{ h.train_count }}</td>
+                  <td>{{ h.log_count }}</td>
+                  <td>
+                    {% set cls = "" %}
+                    {% if h.status == "good" %}
+                      {% set cls = "pill-health-good" %}
+                    {% elif h.status == "medium" %}
+                      {% set cls = "" %}
+                    {% elif h.status == "needs_training" or h.status == "low" %}
+                      {% set cls = "pill-health-low" %}
+                    {% endif %}
+                    <span class="pill {{ cls }}">{{ h.status_label }}</span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <p class="small-muted" style="margin-top:6px;">
+              Faustregel: Grün ≥ 20 Beispiele, Gelb 5–19, Rot = wenig oder keine Trainingsdaten
+              (trotz Nutzung in Logs).
+            </p>
+          {% else %}
+            <p class="small-muted">
+              Noch keine Intents vorhanden, für die Health berechnet werden konnte.
+            </p>
+          {% endif %}
         </div>
 
         {% if not no_logs %}
@@ -750,10 +813,10 @@
             html += `<div class="small-muted" style="margin-top:2px;">`
                  + `Trainingsbeispiele für <code>${a.predicted_intent}</code>: `
                  + `${a.predicted_train_count}</div>`;
-          }     
+          }
 
           if (Array.isArray(a.top) && a.top.length > 0) {
-            html += `<div style="margin-top:4px;">Top-Intents:</div>`;
+            html += `<div style="margin-top:6px;">Top-Intents:</div>`;
             html += `<ul style="margin:4px 0 0; padding-left:18px;">`;
             a.top.forEach(item => {
               const trainCount =
