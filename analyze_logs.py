@@ -133,3 +133,39 @@ if __name__ == "__main__":
         basic = compute_basic_stats(rows)
         print("Gesamtzeilen:", basic["total_rows"])
         print("Mit User-Text:", basic["rows_with_user_text"])
+
+def recent_unknowns(rows, limit: int = 20):
+    """
+    Liefert die letzten `limit` Einträge mit Intent 'unknown'.
+
+    Erwartet rows als Liste von Dicts mit Schlüsseln:
+    - timestamp
+    - user_text
+    - bot_answer
+    - intent
+    - note
+    """
+    # Nur Unknowns mit User-Text
+    unknowns = [
+        r for r in rows
+        if (r.get("intent") == "unknown") and (r.get("user_text") or "").strip()
+    ]
+
+    # Nach Zeit absteigend sortieren (neueste zuerst)
+    def _key(r):
+        return r.get("timestamp") or ""
+
+    unknowns_sorted = sorted(unknowns, key=_key, reverse=True)
+
+    # Nur die ersten `limit`
+    trimmed = unknowns_sorted[:limit]
+
+    # Falls nötig, Text etwas kürzen für die Anzeige
+    for r in trimmed:
+        text = (r.get("user_text") or "").strip()
+        if len(text) > 120:
+            r["user_text_short"] = text[:117] + "..."
+        else:
+            r["user_text_short"] = text
+
+    return trimmed        

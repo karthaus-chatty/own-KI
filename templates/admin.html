@@ -376,7 +376,9 @@
     </header>
 
     <main class="content">
+      <!-- Linke Spalte -->
       <section>
+        <!-- Aktionen -->
         <div class="card">
           <div class="card-header">
             <div>
@@ -418,6 +420,7 @@
         </div>
 
         {% if no_logs %}
+          <!-- Keine Logs -->
           <div class="card">
             <div class="card-header">
               <div class="card-title">Keine Logs gefunden</div>
@@ -428,6 +431,7 @@
             </p>
           </div>
         {% else %}
+          <!-- Basis-Statistik -->
           <div class="card">
             <div class="card-header">
               <div>
@@ -446,6 +450,48 @@
             </p>
           </div>
 
+          <!-- Letzte Unknown-Intents -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Letzte Unknown-Intents</div>
+                <div class="card-subtitle">Hilfreich zum Labeln & Training</div>
+              </div>
+            </div>
+
+            {% if recent_unknowns_list and recent_unknowns_list|length > 0 %}
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 26%;">Zeit</th>
+                    <th style="width: 52%;">User-Text</th>
+                    <th style="width: 22%;">Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in recent_unknowns_list %}
+                  <tr>
+                    <td>{{ row.timestamp }}</td>
+                    <td title="{{ row.user_text }}">{{ row.user_text_short or row.user_text }}</td>
+                    <td>{{ row.note }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <p class="small-muted" style="margin-top:6px;">
+                Es werden die letzten {{ recent_unknowns_list|length }} Unknown-Intents angezeigt
+                (neueste zuerst). Zum Re-Labeln kannst du den Text hier rauskopieren
+                oder die <code>data/unknowns.csv</code> nutzen.
+              </p>
+            {% else %}
+              <p class="small-muted">
+                Derzeit sind keine Unknown-Intents in den letzten Logs vorhanden
+                oder sie wurden bereits anders klassifiziert.
+              </p>
+            {% endif %}
+          </div>
+
+          <!-- Intents-Verteilung -->
           <div class="card">
             <div class="card-header">
               <div class="card-title">Intents</div>
@@ -473,30 +519,42 @@
         {% endif %}
       </section>
 
+      <!-- Rechte Spalte -->
       <section>
         {% if not no_logs %}
+          <!-- Intent-Debug -->
           <div class="card">
             <div class="card-header">
-              <div class="card-title">Intent-Debug</div>
+              <div>
+                <div class="card-title">Intent-Debug</div>
                 <div class="card-subtitle">Text eingeben und Klassifikation prüfen</div>
-                </div>
-                <div>
-                  <textarea id="debug-intent-input"
-                    rows="3"
-                    style="width:100%; border-radius:10px; border:1px solid var(--border-subtle); padding:6px; font-size:13px; background:var(--bg-card); color:var(--text-main);"></textarea>
-                      <div style="margin-top:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-                        <button id="debug-intent-btn" type="button">
-                          Intent testen
-                        </button>
-                        <span class="small-muted">
-                          Zeigt dir den erkannten Intent, Confidence und die Top-Alternativen.
-                        </span>
-                      </div>
-                      <div id="debug-intent-result" class="small-muted" style="margin-top:8px;"></div>
-                      </div>
+              </div>
             </div>
-              <div class="card-title">Nachrichten pro Tag</div>
-              <div class="card-subtitle">Aktivitätsverlauf</div>
+            <div>
+              <textarea
+                id="debug-intent-input"
+                rows="3"
+                style="width:100%; border-radius:10px; border:1px solid var(--border-subtle); padding:6px; font-size:13px; background:var(--bg-card); color:var(--text-main);"
+              ></textarea>
+              <div style="margin-top:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                <button id="debug-intent-btn" type="button">
+                  Intent testen
+                </button>
+                <span class="small-muted">
+                  Zeigt dir den erkannten Intent, Confidence und die Top-Alternativen.
+                </span>
+              </div>
+              <div id="debug-intent-result" class="small-muted" style="margin-top:8px;"></div>
+            </div>
+          </div>
+
+          <!-- Nachrichten pro Tag -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Nachrichten pro Tag</div>
+                <div class="card-subtitle">Aktivitätsverlauf</div>
+              </div>
             </div>
             {% if per_day %}
               <table>
@@ -520,6 +578,7 @@
             {% endif %}
           </div>
 
+          <!-- Beispiele pro Intent -->
           <div class="card">
             <div class="card-header">
               <div class="card-title">Beispiele pro Intent</div>
@@ -539,6 +598,7 @@
             {% endfor %}
           </div>
 
+          <!-- Top-Wörter gesamt -->
           <div class="card">
             <div class="card-header">
               <div class="card-title">Top-Wörter gesamt</div>
@@ -560,6 +620,7 @@
             {% endif %}
           </div>
 
+          <!-- Top-Wörter pro Intent -->
           <div class="card">
             <div class="card-header">
               <div class="card-title">Top-Wörter pro Intent</div>
@@ -633,6 +694,7 @@
     const debugInput = document.getElementById("debug-intent-input");
     const debugResult = document.getElementById("debug-intent-result");
 
+    // Intent-Debug
     if (debugBtn && debugInput && debugResult) {
       debugBtn.addEventListener("click", async () => {
         const text = debugInput.value.trim();
@@ -655,7 +717,8 @@
 
           const data = await res.json();
           if (!res.ok || !data.ok) {
-            debugResult.textContent = "Fehler: " + (data.message || "Intent-Analyse fehlgeschlagen.");
+            debugResult.textContent =
+              "Fehler: " + (data.message || "Intent-Analyse fehlgeschlagen.");
             return;
           }
 
@@ -684,6 +747,7 @@
       });
     }
 
+    // Unknown-Export
     if (exportBtn) {
       exportBtn.addEventListener("click", async () => {
         exportStatus.textContent = "Export läuft...";
@@ -697,7 +761,8 @@
           });
           const data = await res.json();
           if (!res.ok || !data.ok) {
-            exportStatus.textContent = "Fehler: " + (data.message || "Export fehlgeschlagen");
+            exportStatus.textContent =
+              "Fehler: " + (data.message || "Export fehlgeschlagen");
           } else {
             exportStatus.textContent = data.message;
           }
@@ -710,6 +775,7 @@
       });
     }
 
+    // Training
     if (trainBtn) {
       trainBtn.addEventListener("click", async () => {
         trainStatus.textContent = "Training läuft...";
@@ -723,7 +789,8 @@
           });
           const data = await res.json();
           if (!res.ok || !data.ok) {
-            trainStatus.textContent = "Fehler: " + (data.message || "Training fehlgeschlagen");
+            trainStatus.textContent =
+              "Fehler: " + (data.message || "Training fehlgeschlagen");
           } else {
             if (data.summary) {
               const s = data.summary;
@@ -733,7 +800,7 @@
             } else {
               trainStatus.textContent = data.message;
             }
-}
+          }
         } catch (err) {
           console.error(err);
           trainStatus.textContent = "Netzwerkfehler beim Training.";

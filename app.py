@@ -35,6 +35,7 @@ from analyze_logs import (
     examples_per_intent,
     top_words_overall,
     top_words_per_intent,
+    recent_unknowns,
 )
 from export_unknowns import export_unknowns
 from train_from_logs import train_model_from_all_data
@@ -368,6 +369,7 @@ def admin_dashboard():
             examples=None,
             top_overall=None,
             top_per_intent=None,
+            recent_unknowns_list=[],
             username=username,
         )
 
@@ -377,6 +379,7 @@ def admin_dashboard():
     examples = examples_per_intent(rows, max_per_intent=5)
     top_overall = top_words_overall(rows, top_n=20)
     top_per_intent = top_words_per_intent(rows, top_n=10, min_count=2)
+    recent_unknowns_list = recent_unknowns(rows, limit=20)
 
     return render_template(
         "admin.html",
@@ -387,6 +390,7 @@ def admin_dashboard():
         examples=examples,
         top_overall=top_overall,
         top_per_intent=top_per_intent,
+        recent_unknowns_list=recent_unknowns_list,
         username=username,
     )
 
