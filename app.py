@@ -51,6 +51,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 TRAINING_JSON = os.path.join(DATA_DIR, "training_data.json")
 FEEDBACK_FILE = os.path.join(DATA_DIR, "feedback.csv")
+KNOWLEDGE_FILE = os.path.join(DATA_DIR, "knowledge_base.json")
 
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 
@@ -64,6 +65,123 @@ print(f"[DEBUG] Voll-App gestartet.")
 print(f"[DEBUG] ADMIN_PASSWORD gesetzt (Länge): {len(ADMIN_PASSWORD)}")
 print(f"[DEBUG] APP_USER: {APP_USER!r}")
 
+def apply_style(answer: str, mode: str) -> str:
+    """
+    Passt den Antwort-Stil an den gewählten Modus an.
+    Modi:
+    - friendly: lockerer Ton, Emojis okay
+    - focus: sachlich, kein unnötiger Schnickschnack
+    - coach: etwas reflektierender Stil
+    """
+    answer = answer or ""
+
+    if mode == "focus":
+        # Sehr sachlich, eher knapp – hier einfach als Platzhalter:
+        # Emojis entfernen und ggf. etwas kürzen, wenn extrem lang.
+        for emo in ["😊", "😄", "😅", "😉", "😎", "❤️", "💙", "😃"]:
+            answer = answer.replace(emo, "")
+        # optional leichte Kürzung bei extrem langem Text
+        if len(answer) > 1500:
+            answer = answer[:1500].rstrip() + " …"
+        return answer
+
+    if mode == "coach":
+        # Sanfter Coach-Ton am Ende
+        extra = "\n\nWenn du magst, erzähl mir gern noch ein bisschen mehr dazu – " \
+                "dann kann ich dir gezielter helfen."
+        # Nicht doppelt anhängen
+        if extra.strip() not in answer:
+            answer = answer.rstrip() + extra
+        return answer
+
+    # friendly (default)
+    return answer
+
+
+def load_knowledge_base() -> dict:
+    """
+    Lädt die Knowledge-Base aus data/knowledge_base.json.
+    """
+    if not os.path.exists(KNOWLEDGE_FILE):
+        return {}
+    try:
+        with open(KNOWLEDGE_FILE, "r", encoding="utf-8") as f:
+            kb = json.load(f) or {}
+        if not isinstance(kb, dict):
+            return {}
+        return kb
+    except Exception as e:
+        print(f"[knowledge] Fehler beim Lesen von knowledge_base.json: {e}")
+        return {}
+
+
+def get_knowledge_snippet(intent: str, max_chars: int = 800) -> str | None:
+    """
+    Versucht, für einen Intent einen Wissens-Snippet zu laden.
+    Nutzt Pfade aus knowledge_base.json und liest die erste existierende Datei.
+    """
+    intent = (intent or "").strip()
+    if not intent:
+        return None
+
+    kb = load_knowledge_base()
+    files = kb.get(intent)
+    if not files:
+        return None
+
+    if isinstance(files, str):
+        files = [files]
+
+    for rel_path in files:
+        if not rel_path:
+            continue
+        if os.path.isabs(rel_path):
+            full_path = rel_path
+        else:
+            full_path = os.path.join(DATA_DIR, rel_path)
+
+        if not os.path.exists(full_path):
+            continue
+
+        try:
+            with open(full_path, "r", encoding="utf-8") as f:
+                text = f.read().strip()
+        except Exception as e:
+            print(f"[knowledge] Fehler beim Lesen von {full_path}: {e}")
+            continue
+
+        if not text:
+            continue
+
+        # Kürzen auf max_chars, möglichst an Absatzgrenze
+        if len(text) > max_chars:
+            cut = text[:max_chars]
+            last_nl = cut.rfind("\n\n")
+            if last_nl > 100:
+                cut = cut[:last_nl]
+            text = cut.rstrip() + " …"
+
+        return text
+
+    return None
+
+
+def apply_knowledge(answer: str, intent: str) -> str:
+    """
+    Hängt – falls vorhanden – einen Wissens-Snippet für den Intent an.
+    """
+    answer = answer or ""
+    snippet = get_knowledge_snippet(intent)
+    if not snippet:
+        return answer
+
+    appended = (
+        answer.rstrip()
+        + "\n\n"
+        + "Zusatzinfo zu diesem Thema:\n"
+        + snippet
+    )
+    return appended
 
 # ===============================
 # User-Verwaltung (Registrierung)
@@ -579,6 +697,105 @@ def api_feedback():
         return jsonify({"ok": False, "message": "Fehler beim Speichern des Feedbacks."}), 500
 
     return jsonify({"ok": True})
+
+@app.route("/api/mode", methods=["GET", "POST"])
+def api_mode():
+    """
+    GET: gibt den aktuellen Modus zurück
+    POST: setzt den Modus (friendly, focus, coach)
+    """
+    if request.method == "GET":
+        mode = session.get("mode", "friendly")
+        return jsonify({"ok": True, "mode": mode})
+
+    data = request.get_json() or {}
+    mode = (data.get("mode") or "").strip().lower()
+
+    allowed = {"friendly", "focus", "coach"}
+    if mode not in allowed:
+        return jsonify({"ok": False, "message": "Ungültiger Modus."}), 400
+
+    session["mode"] = mode
+    return jsonify({"ok": True, "mode": mode})
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    """
+    Chat-Endpoint:
+    - nimmt User-Text entgegen
+    - ruft generate_response auf
+    - reichert Antwort mit Knowledge-Snippet an (falls vorhanden)
+    - passt Stil an gewählten Modus an
+    - liefert answer, intent, confidence
+    """
+    data = request.get_json() or {}
+    user_text = (data.get("message") or data.get("text") or "").strip()
+
+    if not user_text:
+        return jsonify({"ok": False, "message": "Leere Nachricht."}), 400
+
+    # Modus aus Session (Default friendly)
+    mode = session.get("mode", "friendly")
+
+    # generate_response kann bei dir je nach Version etwas anderes zurückgeben.
+    # Wir sind tolerant und unterstützen tuple oder dict oder plain string.
+    result = generate_response(user_text)
+
+    answer = ""
+    intent = "unknown"
+    confidence = 0.0
+
+    # tuple: (answer, intent, confidence) o.Ä.
+    if isinstance(result, tuple):
+        if len(result) >= 1:
+            answer = result[0]
+        if len(result) >= 2:
+            intent = result[1] or intent
+        if len(result) >= 3:
+            try:
+                confidence = float(result[2])
+            except Exception:
+                confidence = 0.0
+
+    # dict-Variante
+    elif isinstance(result, dict):
+        answer = result.get("answer", "") or ""
+        intent = result.get("intent") or intent
+        try:
+            confidence = float(result.get("confidence") or 0.0)
+        except Exception:
+            confidence = 0.0
+
+    # plain string
+    else:
+        answer = str(result)
+
+    # Wissens-Snippet anhängen
+    answer = apply_knowledge(answer, intent)
+
+    # Stil anwenden
+    answer = apply_style(answer, mode)
+
+    # Optional: Logging – falls nicht schon in generate_response enthalten
+    try:
+        log_message(
+            user_text=user_text,
+            bot_answer=answer,
+            intent=intent,
+            confidence=confidence,
+        )
+    except Exception as e:
+        print(f"[api_chat] Konnte Log nicht schreiben: {e}")
+
+    return jsonify(
+        {
+            "ok": True,
+            "answer": answer,
+            "intent": intent,
+            "confidence": confidence,
+            "mode": mode,
+        }
+    )
 
 # ===============================
 # Main

@@ -115,6 +115,8 @@
       align-items: center;
       gap: 8px;
       font-size: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .badge-env {
@@ -156,6 +158,19 @@
       gap: 6px;
     }
 
+    .mode-select {
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      padding: 4px 8px;
+      font-size: 12px;
+      background: rgba(15, 23, 42, 0.05);
+      color: var(--text-main);
+    }
+
+    :root[data-theme="light"] .mode-select {
+      background: rgba(255, 255, 255, 0.8);
+    }
+
     .content {
       flex: 1;
       max-width: 900px;
@@ -185,6 +200,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .chat-header-title {
@@ -193,6 +209,11 @@
     }
 
     .chat-header-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .mode-badge {
       font-size: 11px;
       color: var(--text-muted);
     }
@@ -340,7 +361,9 @@
     .typing-indicator {
       font-size: 11px;
       color: var(--text-muted);
-      margin-left: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
     }
 
     .typing-dot {
@@ -389,6 +412,12 @@
         </div>
         <div class="header-right">
           <span class="badge-env">Chat</span>
+          <label class="small-muted" for="mode-select">Modus:</label>
+          <select id="mode-select" class="mode-select">
+            <option value="friendly">Friendly</option>
+            <option value="focus">Focus</option>
+            <option value="coach">Coach</option>
+          </select>
           <a href="/admin" class="header-link">Admin</a>
           <a href="/logout" class="header-link">Logout</a>
           <button id="theme-toggle" class="theme-toggle" type="button">🌙 Dunkel</button>
@@ -405,9 +434,14 @@
               Intents, Training & Feedback – alles aus einem Guss.
             </div>
           </div>
-          <div id="typing-indicator" class="typing-indicator" style="display:none;">
-            Antwort wird generiert
-            <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
+            <div id="mode-display" class="mode-badge">
+              Modus: <code>friendly</code>
+            </div>
+            <div id="typing-indicator" class="typing-indicator" style="display:none;">
+              Antwort wird generiert
+              <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+            </div>
           </div>
         </div>
 
@@ -416,7 +450,8 @@
             <div class="bubble">
               Hey 👋 Ich bin deine eigene kleine KI.  
               Stell mir Fragen oder sag mir, wobei ich dir helfen soll –
-              und im Admin-Bereich kannst du mich immer weiter trainieren.
+              und im Admin-Bereich kannst du mich immer weiter trainieren,
+              Intents labeln und mein Verhalten feinjustieren.
             </div>
           </div>
         </div>
@@ -488,6 +523,45 @@
     const userInput = document.getElementById("user-input");
     const sendBtn = document.getElementById("send-btn");
     const typingIndicator = document.getElementById("typing-indicator");
+    const modeSelect = document.getElementById("mode-select");
+    const modeDisplay = document.getElementById("mode-display");
+
+    function setModeDisplay(mode) {
+      if (!modeDisplay) return;
+      modeDisplay.innerHTML = `Modus: <code>${mode}</code>`;
+    }
+
+    async function fetchCurrentMode() {
+      try {
+        const res = await fetch("/api/mode", { method: "GET" });
+        const data = await res.json();
+        if (data && data.mode) {
+          if (modeSelect) {
+            modeSelect.value = data.mode;
+          }
+          setModeDisplay(data.mode);
+        }
+      } catch (err) {
+        console.error("Fehler beim Laden des Modus:", err);
+      }
+    }
+
+    if (modeSelect) {
+      modeSelect.addEventListener("change", async () => {
+        const mode = modeSelect.value;
+        setModeDisplay(mode);
+        try {
+          await fetch("/api/mode", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode }),
+          });
+        } catch (err) {
+          console.error("Fehler beim Setzen des Modus:", err);
+        }
+      });
+      fetchCurrentMode();
+    }
 
     function addMessage(role, text, meta = {}) {
       const msg = document.createElement("div");
@@ -529,6 +603,7 @@
     }
 
     function setTyping(visible) {
+      if (!typingIndicator) return;
       typingIndicator.style.display = visible ? "inline-flex" : "none";
     }
 
@@ -559,6 +634,10 @@
             "Ups, da ist etwas schiefgelaufen. Versuch es bitte gleich nochmal."
           );
         } else {
+          if (data.mode && modeSelect) {
+            modeSelect.value = data.mode;
+            setModeDisplay(data.mode);
+          }
           addMessage("bot", data.answer, {
             intent: data.intent || "",
             confidence: data.confidence,
