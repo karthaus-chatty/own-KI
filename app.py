@@ -423,45 +423,6 @@ def index():
     return render_template("index.html", username=username)
 
 
-@app.route("/api/chat", methods=["POST"])
-@requires_login
-def api_chat():
-    data = request.get_json() or {}
-    user_text = (data.get("message") or "").strip()
-
-    if not user_text:
-        return jsonify({"error": "Leere Nachricht"}), 400
-
-    history = session.get("history", [])
-
-    answer, intent, confidence = generate_response(user_text)
-    answer = tweak_answer_with_context(answer, intent, history)
-
-    session_id = session.get("session_id", "unknown")
-    note = f"conf={confidence:.3f};session={session_id}"
-
-    try:
-        log_message(user_text, answer, intent, note=note)
-    except Exception as e:
-        print(f"[DEBUG] Konnte Log nicht schreiben: {e}")
-
-    # Historie aktualisieren (letzte 20 Einträge)
-    history.append(
-        {"role": "user", "text": user_text, "intent": intent, "confidence": confidence}
-    )
-    history.append(
-        {"role": "bot", "text": answer, "intent": intent, "confidence": confidence}
-    )
-    session["history"] = history[-20:]
-
-    return jsonify(
-        {
-            "answer": answer,
-            "intent": intent,
-            "confidence": confidence,
-        }
-    )
-
 
 @app.route("/api/intents", methods=["GET"])
 @requires_login
