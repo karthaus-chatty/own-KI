@@ -1,5 +1,6 @@
 # app.py – Voll-App mit Login, Registrierung, Admin, Logging & Session-Kontext
 
+import csv
 import os
 import base64
 import uuid
