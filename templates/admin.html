@@ -450,12 +450,12 @@
             </p>
           </div>
 
-          <!-- Letzte Unknown-Intents -->
+          <!-- Letzte Unknown-Intents mit Annotation-Tool -->
           <div class="card">
             <div class="card-header">
               <div>
                 <div class="card-title">Letzte Unknown-Intents</div>
-                <div class="card-subtitle">Hilfreich zum Labeln & Training</div>
+                <div class="card-subtitle">Direkt labeln & zu Trainingsdaten hinzufügen</div>
               </div>
             </div>
 
@@ -463,9 +463,10 @@
               <table>
                 <thead>
                   <tr>
-                    <th style="width: 26%;">Zeit</th>
-                    <th style="width: 52%;">User-Text</th>
-                    <th style="width: 22%;">Note</th>
+                    <th style="width: 18%;">Zeit</th>
+                    <th style="width: 42%;">User-Text</th>
+                    <th style="width: 18%;">Neuer Intent</th>
+                    <th style="width: 22%;">Aktion</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -473,15 +474,32 @@
                   <tr>
                     <td>{{ row.timestamp }}</td>
                     <td title="{{ row.user_text }}">{{ row.user_text_short or row.user_text }}</td>
-                    <td>{{ row.note }}</td>
+                    <td>
+                      <input
+                        type="text"
+                        class="annot-intent-input"
+                        placeholder="z.B. feelings"
+                        style="width:100%; border-radius:999px; border:1px solid var(--border-subtle); padding:3px 6px; font-size:11px; background:var(--bg-card); color:var(--text-main);"
+                      />
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        class="annot-btn"
+                        data-text="{{ row.user_text|e }}"
+                        style="margin-bottom:4px;"
+                      >
+                        Zu Trainingsdaten
+                      </button>
+                      <div class="annot-row-status small-muted"></div>
+                    </td>
                   </tr>
                   {% endfor %}
                 </tbody>
               </table>
               <p class="small-muted" style="margin-top:6px;">
-                Es werden die letzten {{ recent_unknowns_list|length }} Unknown-Intents angezeigt
-                (neueste zuerst). Zum Re-Labeln kannst du den Text hier rauskopieren
-                oder die <code>data/unknowns.csv</code> nutzen.
+                Tipp: Mehrere Unknowns mit demselben Intent beschriften (z.B. <code>feelings</code>, <code>work_situation</code>,
+                <code>python_help</code>) und danach <strong>„Modell neu trainieren“</strong> ausführen.
               </p>
             {% else %}
               <p class="small-muted">
@@ -809,6 +827,52 @@
         }
       });
     }
+
+    // Annotation-Tool (Unknowns → training_data.json)
+    document.querySelectorAll(".annot-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const tr = btn.closest("tr");
+        if (!tr) return;
+
+        const input = tr.querySelector(".annot-intent-input");
+        const status = tr.querySelector(".annot-row-status");
+        const text = btn.getAttribute("data-text") || "";
+        const intent = (input && input.value.trim()) || "";
+
+        if (!intent) {
+          if (status) status.textContent = "Bitte Intent-Namen eingeben.";
+          return;
+        }
+
+        if (status) status.textContent = "Speichere...";
+        btn.disabled = true;
+
+        try {
+          const res = await fetch("/admin/annotate", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ text, intent }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            if (status) {
+              status.textContent =
+                "Fehler: " + (data.message || "Konnte Beispiel nicht speichern.");
+            }
+          } else {
+            if (status) status.textContent = "Gespeichert ✔ – nach Training aktiv.";
+          }
+        } catch (err) {
+          console.error(err);
+          if (status) status.textContent = "Netzwerkfehler beim Speichern.";
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
   </script>
 </body>
 </html>

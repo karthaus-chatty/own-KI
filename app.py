@@ -47,6 +47,7 @@ from train_from_logs import train_model_from_all_data
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
+TRAINING_JSON = os.path.join(DATA_DIR, "training_data.json")
 
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 
@@ -450,6 +451,55 @@ def admin_debug_intent():
                 "message": f"Fehler bei der Intent-Analyse: {e}",
             }
         ), 500
+
+@app.route("/admin/annotate", methods=["POST"])
+@requires_login
+@requires_auth
+def admin_annotate():
+    """
+    Nimmt einen Text + Intent aus dem Admin entgegen
+    und hängt ihn an data/training_data.json an.
+    """
+    from flask import current_app  # optional, nur falls du loggen willst
+
+    data = request.get_json() or {}
+    text = (data.get("text") or "").strip()
+    intent = (data.get("intent") or "").strip()
+
+    if not text:
+        return jsonify({"ok": False, "message": "Kein Text übergeben."}), 400
+    if not intent:
+        return jsonify({"ok": False, "message": "Kein Intent angegeben."}), 400
+
+    # Datei einlesen oder Grundstruktur erzeugen
+    payload = {"data": []}
+    if os.path.exists(TRAINING_JSON):
+        try:
+            with open(TRAINING_JSON, "r", encoding="utf-8") as f:
+                payload = json.load(f) or {"data": []}
+        except Exception:
+            # falls kaputt, fangen wir lieber sauber neu an
+            payload = {"data": []}
+
+    if "data" not in payload or not isinstance(payload["data"], list):
+        payload["data"] = []
+
+    payload["data"].append({"text": text, "intent": intent})
+
+    try:
+        with open(TRAINING_JSON, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[admin_annotate] Schreibfehler: {e}")
+        return jsonify({"ok": False, "message": f"Konnte training_data.json nicht schreiben: {e}"}), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "message": f"Beispiel gespeichert (Intent: {intent}). "
+                       "Starte danach ein Re-Training, damit es aktiv wird.",
+        }
+    )
 
 
 # ===============================
