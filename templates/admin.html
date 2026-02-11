@@ -521,33 +521,33 @@
 
       <!-- Rechte Spalte -->
       <section>
-        {% if not no_logs %}
-          <!-- Intent-Debug -->
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Intent-Debug</div>
-                <div class="card-subtitle">Text eingeben und Klassifikation prüfen</div>
-              </div>
-            </div>
+        <!-- Intent-Debug: immer sichtbar -->
+        <div class="card">
+          <div class="card-header">
             <div>
-              <textarea
-                id="debug-intent-input"
-                rows="3"
-                style="width:100%; border-radius:10px; border:1px solid var(--border-subtle); padding:6px; font-size:13px; background:var(--bg-card); color:var(--text-main);"
-              ></textarea>
-              <div style="margin-top:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-                <button id="debug-intent-btn" type="button">
-                  Intent testen
-                </button>
-                <span class="small-muted">
-                  Zeigt dir den erkannten Intent, Confidence und die Top-Alternativen.
-                </span>
-              </div>
-              <div id="debug-intent-result" class="small-muted" style="margin-top:8px;"></div>
+              <div class="card-title">Intent-Debug</div>
+              <div class="card-subtitle">Text eingeben und Klassifikation prüfen</div>
             </div>
           </div>
+          <div>
+            <textarea
+              id="debug-intent-input"
+              rows="3"
+              style="width:100%; border-radius:10px; border:1px solid var(--border-subtle); padding:6px; font-size:13px; background:var(--bg-card); color:var(--text-main);"
+            ></textarea>
+            <div style="margin-top:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+              <button id="debug-intent-btn" type="button">
+                Intent testen
+              </button>
+              <span class="small-muted">
+                Zeigt dir den erkannten Intent, Confidence und die Top-Alternativen.
+              </span>
+            </div>
+            <div id="debug-intent-result" class="small-muted" style="margin-top:8px;"></div>
+          </div>
+        </div>
 
+        {% if not no_logs %}
           <!-- Nachrichten pro Tag -->
           <div class="card">
             <div class="card-header">
