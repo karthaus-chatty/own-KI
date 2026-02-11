@@ -1,0 +1,7 @@
+{
+  "flask": "Flask ist ein leichtgewichtiges Webframework für Python. Es erlaubt dir, schnell HTTP-Endpunkte zu definieren, Templates zu rendern und kleine bis mittelgroße Webanwendungen zu bauen.",
+  "künstliche intelligenz": "Künstliche Intelligenz (KI) bezeichnet Systeme, die Aufgaben lösen, für die man sonst menschliche Intelligenz bräuchte – zum Beispiel Bilder erkennen, Texte verstehen oder Entscheidungen treffen.",
+  "ki": "KI ist die Abkürzung für Künstliche Intelligenz. Praktisch geht es meist um Modelle, die aus Daten lernen und Muster erkennen.",
+  "machine learning": "Machine Learning ist ein Teilgebiet der KI, bei dem Modelle aus Beispieldaten lernen, statt explizit programmiert zu werden. Klassische Beispiele sind Spam-Erkennung, Empfehlungssysteme oder Vorhersagen.",
+  "eigene ki programmieren": "Um eine eigene KI zu programmieren, brauchst du typischerweise: (1) ein klares Problem, (2) passende Daten, (3) ein Modell, (4) Training, (5) Evaluation und (6) eine Integration in eine Anwendung (z.B. Flask-API oder Web-App)."
+}

@@ -1,0 +1,80 @@
+{
+  "data": [
+    { "text": "Moin Chef", "intent": "greeting" },
+    { "text": "Na du", "intent": "greeting" },
+    { "text": "Guten Tag", "intent": "greeting" },
+
+    { "text": "Bis dann", "intent": "goodbye" },
+    { "text": "Mach's gut", "intent": "goodbye" },
+    { "text": "Ich logge mich aus", "intent": "goodbye" },
+
+    { "text": "Danke dir", "intent": "thanks" },
+    { "text": "Du hast mir sehr geholfen", "intent": "thanks" },
+    { "text": "Danke, das war genau das was ich brauchte", "intent": "thanks" },
+
+    { "text": "Mir geht es heute nicht so gut", "intent": "feelings" },
+    { "text": "Ich hab gerade ein emotionales Tief", "intent": "feelings" },
+    { "text": "Ich bin total überfordert mit allem", "intent": "stress" },
+    { "text": "Zu viel Stress auf der Arbeit", "intent": "stress" },
+    { "text": "Ich weiß nicht, wie ich alles schaffen soll", "intent": "stress" },
+
+    { "text": "Ich hab Stress mit einer Kollegin", "intent": "relationship" },
+    { "text": "Ich bin mir unsicher, was ich ihr schreiben soll", "intent": "relationship" },
+    { "text": "Ich mag jemanden in meinem Team", "intent": "relationship" },
+
+    { "text": "Ich bin unzufrieden in meinem Job", "intent": "work_situation" },
+    { "text": "Ich überlege, den Job zu wechseln", "intent": "work_situation" },
+    { "text": "Ich brauche Hilfe bei einer beruflichen Entscheidung", "intent": "work_situation" },
+
+    { "text": "Motivier mich mal kurz", "intent": "motivation" },
+    { "text": "Ich brauche einen kleinen Kickstart", "intent": "motivation" },
+
+    { "text": "Hilf mir bei einer schweren Entscheidung", "intent": "decision_help" },
+    { "text": "Ich kann mich nicht zwischen zwei Optionen entscheiden", "intent": "decision_help" },
+
+    { "text": "Wie schreibe ich eine Funktion in Python?", "intent": "python_help" },
+    { "text": "Was ist der Unterschied zwischen einer Liste und einem Tuple in Python?", "intent": "python_help" },
+    { "text": "Wie installiere ich ein Paket mit pip?", "intent": "python_help" },
+
+    { "text": "Wie baue ich einen einfachen Webserver mit Flask?", "intent": "web_dev" },
+    { "text": "Wie funktioniert eine REST API mit Flask?", "intent": "web_dev" },
+    { "text": "Wie kann ich ein Login-System in Flask bauen?", "intent": "web_dev" },
+
+    { "text": "Was ist künstliche Intelligenz?", "intent": "ai_explanation" },
+    { "text": "Erkläre mir Machine Learning ausführlicher", "intent": "ai_explanation" },
+    { "text": "Was ist Deep Learning?", "intent": "ai_explanation" },
+
+    { "text": "Ich bekomme eine Traceback Fehlermeldung", "intent": "error_debug" },
+    { "text": "Mein Code wirft eine Exception", "intent": "error_debug" },
+    { "text": "Python sagt ModuleNotFoundError", "intent": "error_debug" },
+
+    { "text": "Wie mache ich ein Git commit?", "intent": "git_help" },
+    { "text": "Warum funktioniert git push nicht?", "intent": "git_help" },
+    { "text": "Wie setze ich ein Remote Repo?", "intent": "git_help" },
+
+    { "text": "Wie deploye ich meine Flask App auf Railway?", "intent": "deployment_help" },
+    { "text": "Was brauche ich für ein Deployment auf Railway?", "intent": "deployment_help" },
+
+    { "text": "Erkläre mir KI wie für ein Kind", "intent": "explain_like_5" },
+    { "text": "Kannst du mir Machine Learning ganz einfach erklären?", "intent": "explain_like_5" },
+
+    { "text": "Vergleiche Flask und Django", "intent": "comparison" },
+    { "text": "Vergleiche Python und Java", "intent": "comparison" },
+
+    { "text": "Was sind die Vor- und Nachteile von KI?", "intent": "pros_cons" },
+    { "text": "Was spricht für und gegen Remote Arbeiten?", "intent": "pros_cons" },
+
+    { "text": "Erkläre mir Schritt für Schritt, wie ich eine Flask App erstelle", "intent": "step_by_step" },
+    { "text": "Gib mir eine Schritt für Schritt Anleitung für eine eigene KI", "intent": "step_by_step" },
+
+    { "text": "Was kannst du alles machen?", "intent": "what_can_you_do" },
+    { "text": "Welche Fähigkeiten hast du?", "intent": "what_can_you_do" },
+
+    { "text": "Wie bist du trainiert worden?", "intent": "training_info" },
+    { "text": "Wie funktionierst du technisch?", "intent": "training_info" },
+
+    { "text": "Wie kann ich meine eigene KI programmieren?", "intent": "ki_programming" },
+    { "text": "Wie erstelle ich meinen eigenen KI Chatbot?", "intent": "ki_programming" },
+    { "text": "Wie baue ich meine eigene ChatGPT-ähnliche KI?", "intent": "ki_programming" }
+  ]
+}

@@ -1,260 +1,577 @@
 # chatbot.py
+#
+# Zentrales Modul für:
+# - Intent-Erkennung (TF-IDF + LogisticRegression)
+# - Hybrid-Logik (ML + Keywords + Knowledge-Base)
+# - Antwortgenerierung pro Intent
+# - Logging von Gesprächen
+
 import os
 import csv
-import random
+import json
 from datetime import datetime
-from typing import List, Tuple, Sequence, Dict, Any
+from typing import List, Tuple, Dict, Any
 
 import joblib
-import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 
-# =========================
-# Pfade & Dateien
-# =========================
+# ==============================
+# Pfade & globale Konfiguration
+# ==============================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-LOG_FILE = os.path.join(DATA_DIR, "chatlog.csv")
 MODEL_FILE = os.path.join(DATA_DIR, "model.pkl")
 VECTORIZER_FILE = os.path.join(DATA_DIR, "vectorizer.pkl")
+TRAINING_JSON = os.path.join(DATA_DIR, "training_data.json")
+LOG_FILE = os.path.join(DATA_DIR, "chatlog.csv")
+KNOWLEDGE_FILE = os.path.join(DATA_DIR, "knowledge_base.json")
 
-# =========================
-# Basis-Trainingsdaten (Minimalfallback)
-# =========================
+UNKNOWN_INTENT = "unknown"
+UNKNOWN_CONFIDENCE_THRESHOLD = 0.45  # darunter → unknown
 
+# Wird später nach Laden des Modells gefüllt
+known_intents: List[str] = []
+
+# ==============================
+# Basis-Trainingsdaten (Seeds)
+# ==============================
+
+# Diese Daten sind fest im Code eingebaut und geben dem Modell Grundverständnis.
+# Sie werden später durch training_data.json und Logs ergänzt.
 base_train_data: List[Tuple[str, str]] = [
+    # greeting
     ("Hallo", "greeting"),
+    ("Hi", "greeting"),
+    ("Hey", "greeting"),
     ("Guten Morgen", "greeting"),
+    ("Guten Abend", "greeting"),
+    ("Servus", "greeting"),
+
+    # goodbye
     ("Tschüss", "goodbye"),
+    ("Ciao", "goodbye"),
+    ("Bis später", "goodbye"),
+    ("Bis morgen", "goodbye"),
+    ("Ich gehe jetzt", "goodbye"),
+
+    # thanks
     ("Danke", "thanks"),
-    ("Was ist künstliche Intelligenz?", "ki_general"),
-    ("Wie trainiert man eine KI?", "ki_training"),
-    ("Wie programmiere ich meine eigene KI?", "ki_programming"),
-    ("Wie installiere ich ein Paket mit pip?", "python_help"),
-    ("Was hältst du von Dubstep?", "music"),
-    ("Wie geht's dir?", "smalltalk"),
-    ("Ich bin gestresst von der Arbeit", "work"),
-    ("Mir geht es heute nicht so gut", "feelings"),
-    ("Ich komme mit einer Kollegin richtig gut klar", "personal_relations"),
+    ("Vielen Dank", "thanks"),
+    ("Mega hilfreich, danke dir", "thanks"),
+    ("Dankeschön", "thanks"),
+
+    # how_are_you
+    ("Wie geht es dir?", "how_are_you"),
+    ("Alles gut bei dir?", "how_are_you"),
+
+    # feelings / stress / work
+    ("Ich bin gestresst", "stress"),
+    ("Ich habe zu viel zu tun", "stress"),
+    ("Ich fühle mich überfordert", "stress"),
+    ("Ich weiß nicht weiter", "feelings"),
+    ("Mir geht es nicht gut", "feelings"),
+    ("Ich bin unsicher wegen meiner Arbeit", "work_situation"),
+    ("Ich bin unzufrieden im Job", "work_situation"),
+
+    # motivation / decision_help
+    ("Motiviere mich", "motivation"),
+    ("Ich brauche Motivation", "motivation"),
+    ("Ich kann mich nicht entscheiden", "decision_help"),
+    ("Hilf mir bei einer Entscheidung", "decision_help"),
+
+    # relationship
+    ("Ich mag eine Kollegin", "relationship"),
+    ("Ich bin verliebt in jemanden", "relationship"),
+    ("Beziehungstipps", "relationship"),
+
+    # tech / coding
+    ("Hilf mir mit Python", "python_help"),
+    ("Wie schreibe ich eine Funktion in Python?", "python_help"),
+    ("Hilf mir bei Webentwicklung", "web_dev"),
+    ("Wie baue ich eine Website?", "web_dev"),
+    ("Was ist Flask?", "web_dev"),
+
+    ("Erkläre mir künstliche Intelligenz", "ai_explanation"),
+    ("Was ist Machine Learning?", "ai_explanation"),
+    ("Wie funktioniert ein neuronales Netz?", "ai_explanation"),
+
+    ("Ich habe einen Fehler in meinem Code", "error_debug"),
+    ("Fehlermeldung in Python", "error_debug"),
+    ("Git push funktioniert nicht", "git_help"),
+    ("Hilf mir mit Git", "git_help"),
+
+    ("Wie deploye ich eine App?", "deployment_help"),
+    ("Deployment auf Railway", "deployment_help"),
+
+    # explanation / definition / comparison
+    ("Erkläre es wie für ein Kind", "explain_like_5"),
+    ("Einfach erklärt bitte", "explain_like_5"),
+    ("Definition von KI", "definition"),
+    ("Was bedeutet Machine Learning?", "definition"),
+    ("Was ist der Unterschied zwischen Flask und Django?", "comparison"),
+    ("Vergleiche Python und Java", "comparison"),
+    ("Vor- und Nachteile von Docker", "pros_cons"),
+    ("Was sind die Nachteile von KI?", "pros_cons"),
+    ("Erkläre mir das Schritt für Schritt", "step_by_step"),
+
+    # meta
+    ("Was kannst du alles?", "what_can_you_do"),
+    ("Was sind deine Fähigkeiten?", "what_can_you_do"),
+    ("Wie bist du trainiert?", "training_info"),
+    ("Wie funktionierst du?", "training_info"),
+
+    # ki_programming (dein Projekt)
+    ("Wie kann ich meine eigene KI programmieren?", "ki_programming"),
+    ("Hilf mir, eine eigene KI zu bauen", "ki_programming"),
+    ("Wie erstelle ich einen eigenen Chatbot?", "ki_programming"),
 ]
 
-# =========================
-# Antworten pro Intent
-# =========================
 
-responses = {
-    "greeting": [
-        "Hey! 😊 Wie kann ich dir heute helfen?",
-        "Hi! Was steht an?",
-        "Moin! Bereit für ein bisschen KI & Code?",
-    ],
-    "goodbye": [
-        "Mach's gut! 👋",
-        "Bis später – ich bin hier, wenn du mich brauchst.",
-        "Ciao, hab einen entspannten Tag!",
-    ],
-    "thanks": [
-        "Gerne! 🙌",
-        "Immer doch 😄",
-        "Freut mich, dass ich helfen konnte!",
-    ],
-    "meta_bot": [
-        "Ich bin dein lokaler Chatbot – spezialisiert auf KI, Python und alles drumherum.",
-        "Ich helfe dir beim Bauen und Trainieren deiner eigenen KI, plus ein bisschen Smalltalk.",
-    ],
-    "ki_general": [
-        "Künstliche Intelligenz ist ein Sammelbegriff für Systeme, die Aufgaben lösen, für die man normalerweise menschliche Intelligenz bräuchte.",
-        "KI umfasst Dinge wie Bilderkennung, Sprachverarbeitung, Vorhersagen und viele andere Bereiche.",
-    ],
-    "ki_training": [
-        "Um eine KI zu trainieren, brauchst du Daten, ein Modell und eine Trainingsprozedur – typischerweise mit Train/Test-Split.",
-        "Wichtig beim Training: genug Daten, gute Features und vernünftige Evaluation (z.B. Accuracy, F1).",
-    ],
-    "ki_programming": [
-        "Ein typischer Start: Python, scikit-learn, ein Datensatz, TF-IDF und ein Klassifikator wie Logistic Regression.",
-        "Du kannst z.B. Textdaten mit TfidfVectorizer featurisieren und dann mit LogisticRegression trainieren.",
-    ],
-    "python_help": [
-        "Python-Frage incoming 😄 Erzähl, woran du hängst.",
-        "Python ist da recht flexibel – beschreib mir dein Problem, dann gehen wir es Schritt für Schritt durch.",
-    ],
-    "music": [
-        "Dubstep, EDM und Metal? Klingt nach einem soliden Setup zum Coden 🤘",
-        "Für Fokus empfehlen viele instrumentale EDM- oder LoFi-Tracks, für Motivation gerne auch Metal.",
-    ],
-    "smalltalk": [
-        "Klar, lass ein bisschen quatschen 😄",
-        "Okay, Pause-Modus aktiviert. Was geht dir gerade durch den Kopf?",
-    ],
-    "work": [
-        "Arbeit kann echt ziehen. Magst du eher über Organisation, Grenzen setzen oder Motivation reden?",
-        "Klingt, als wäre im Job gut was los. Erzähl mir ein bisschen mehr, dann sortieren wir das gemeinsam.",
-    ],
-    "feelings": [
-        "Danke, dass du das teilst. ❤️ Willst du eher venten, ablenken oder eine kleine Strategie überlegen?",
-        "Gefühle sind kein Bug, sondern Feature – wir können gern kurz sortieren, was gerade los ist.",
-    ],
-    "personal_relations": [
-        "Zwischenmenschliche Themen sind immer spannend, aber auch komplex. Wir können das Schritt für Schritt durchgehen – ohne dass ich dir irgendwas aufdränge.",
-        "Klingt, als ginge es um eine besondere Person 😉 Ich kann dir helfen, deine Gedanken zu sortieren, keine „Tipps aus der Gießkanne“.",
-    ],
-    "unknown": [
-        "Da bin ich mir noch nicht sicher 🤔 Magst du das anders formulieren?",
-        "Das kann ich noch nicht richtig einordnen – vielleicht später ein eigener Intent?",
-    ],
-}
+# ==============================
+# Knowledge Base laden
+# ==============================
 
-known_intents = sorted(set(intent for _, intent in base_train_data) | set(responses.keys()))
-
-# =========================
-# Logging
-# =========================
-
-def log_message(user_text: str, bot_answer: str, intent: str, note: str = ""):
-    timestamp = datetime.now().isoformat(timespec="seconds")
-    with open(LOG_FILE, mode="a", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([timestamp, user_text, bot_answer, intent, note])
+def load_knowledge_base() -> Dict[str, str]:
+    if not os.path.exists(KNOWLEDGE_FILE):
+        return {}
+    try:
+        with open(KNOWLEDGE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception as e:
+        print(f"[chatbot] Konnte knowledge_base.json nicht lesen: {e}")
+    return {}
 
 
-# =========================
-# Modell laden / trainieren
-# =========================
+knowledge_base = load_knowledge_base()
 
-def train_model(train_data: List[Tuple[str, str]]):
+
+# ==============================
+# Training & Modell laden
+# ==============================
+
+def train_model(train_data: List[Tuple[str, str]]) -> Tuple[TfidfVectorizer, LogisticRegression]:
     texts = [t for t, _ in train_data]
-    labels = [i for _, i in train_data]
+    intents = [i for _, i in train_data]
 
     vectorizer = TfidfVectorizer(
         ngram_range=(1, 2),
         min_df=1,
-        max_df=0.95,
+        max_df=0.9,
     )
     X = vectorizer.fit_transform(texts)
 
-    model = LogisticRegression(max_iter=1000)
-    model.fit(X, labels)
-
+    model = LogisticRegression(
+        max_iter=1000,
+        n_jobs=1,
+        multi_class="auto",
+    )
+    model.fit(X, intents)
     return vectorizer, model
 
 
-def load_or_train_model():
-    if os.path.exists(MODEL_FILE) and os.path.exists(VECTORIZER_FILE):
-        print(f"[chatbot] Lade Modell aus {MODEL_FILE}")
-        model = joblib.load(MODEL_FILE)
-        vectorizer = joblib.load(VECTORIZER_FILE)
-        return vectorizer, model
+def load_additional_training_data() -> List[Tuple[str, str]]:
+    """Lädt zusätzliche Trainingsdaten aus data/training_data.json, falls vorhanden."""
+    if not os.path.exists(TRAINING_JSON):
+        return []
+    try:
+        with open(TRAINING_JSON, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        items = []
+        for item in data.get("data", []):
+            text = (item.get("text") or "").strip()
+            intent = (item.get("intent") or "").strip()
+            if text and intent:
+                items.append((text, intent))
+        print(f"[chatbot] Zusätzliche Trainingsdaten aus training_data.json: {len(items)} Beispiele.")
+        return items
+    except Exception as e:
+        print(f"[chatbot] Konnte training_data.json nicht lesen: {e}")
+        return []
 
-    print("[chatbot] Kein gespeichertes Modell gefunden – trainiere Basis-Modell.")
-    vectorizer, model = train_model(base_train_data)
+
+def initial_train_if_needed():
+    """
+    Wenn kein Modell vorhanden ist, trainiere eines aus base_train_data + training_data.json.
+    Wird beim Import von chatbot.py einmal aufgerufen.
+    """
+    global known_intents
+
+    if os.path.exists(MODEL_FILE) and os.path.exists(VECTORIZER_FILE):
+        try:
+            model = joblib.load(MODEL_FILE)
+            known_intents = sorted(list(model.classes_))
+            print(f"[chatbot] Modell geladen. Intents: {known_intents}")
+            return
+        except Exception as e:
+            print(f"[chatbot] Modell konnte nicht geladen werden: {e}")
+            # fällt unten auf Neu-Training zurück
+
+    print("[chatbot] Kein gültiges Modell gefunden – initiales Training...")
+    train_data = list(base_train_data)
+    train_data.extend(load_additional_training_data())
+
+    vectorizer, model = train_model(train_data)
     joblib.dump(model, MODEL_FILE)
     joblib.dump(vectorizer, VECTORIZER_FILE)
+    known_intents = sorted(list(model.classes_))
+    print(f"[chatbot] Initiales Modell trainiert. Intents: {known_intents}")
+
+
+# beim Import direkt sicherstellen, dass ein Modell da ist
+initial_train_if_needed()
+
+
+def load_model():
+    vectorizer = joblib.load(VECTORIZER_FILE)
+    model = joblib.load(MODEL_FILE)
     return vectorizer, model
 
 
-vectorizer, model = load_or_train_model()
+# ==============================
+# Intent-Vorhersage
+# ==============================
 
-# =========================
-# Prediction + Response
-# =========================
-
-def predict_intent_with_confidence(user_text: str):
+def predict_intent(user_text: str) -> Tuple[str, float]:
+    """
+    Gibt (intent, confidence) zurück. Wenn Confidence unter Threshold, intent=unknown.
+    """
+    vectorizer, model = load_model()
     X = vectorizer.transform([user_text])
     probs = model.predict_proba(X)[0]
-    best_idx = int(np.argmax(probs))
-    intent = model.classes_[best_idx]
-    confidence = float(probs[best_idx])
-    return intent, confidence
+    classes = model.classes_
+    max_idx = probs.argmax()
+    predicted_intent = classes[max_idx]
+    confidence = float(probs[max_idx])
+
+    # Unknown-Handling
+    if confidence < UNKNOWN_CONFIDENCE_THRESHOLD:
+        return UNKNOWN_INTENT, confidence
+
+    return predicted_intent, confidence
 
 
-def generate_response(user_text: str):
+# ==============================
+# Logging
+# ==============================
+
+def log_message(user_text: str, bot_answer: str, intent: str, note: str = ""):
     """
-    Gibt (answer, intent, confidence) zurück.
+    Schreibt eine Zeile in data/chatlog.csv:
+    [timestamp, user_text, bot_answer, intent, note]
     """
-    intent, confidence = predict_intent_with_confidence(user_text)
+    ts = datetime.utcnow().isoformat()
+    row = [ts, user_text, bot_answer, intent, note]
 
-    if intent in responses:
-        answer = random.choice(responses[intent])
-    else:
-        answer = random.choice(responses["unknown"])
+    # sicherstellen, dass Datenordner existiert
+    os.makedirs(DATA_DIR, exist_ok=True)
 
-    return answer, intent, confidence
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(row)
+    except Exception as e:
+        print(f"[chatbot] Konnte Log nicht schreiben: {e}")
 
 
-# =========================
-# Kontext-Tweaks
-# =========================
+# ==============================
+# Kontext-Nachbearbeitung
+# ==============================
 
-def tweak_answer_with_context(answer: str, intent: str, history: Sequence[Dict[str, Any]]) -> str:
+def tweak_answer_with_context(answer: str, intent: str, history: List[Dict[str, Any]]) -> str:
     """
-    Nimmt die vom Modell gewählte Antwort und passt sie leicht an,
-    basierend auf der bisherigen Session-Historie.
-
-    history: Liste von Dicts wie
-      {"role": "user"/"bot", "text": str, "intent": str, "confidence": float}
+    Optionale Kontextanpassungen auf Basis der letzten Messages.
+    history: Liste von Dicts wie {"role": "user"/"bot", "text": "...", "intent": "...", "confidence": ...}
     """
-    if not history:
-        return answer
-
-    # letztes User-Intent aus der Historie finden
-    last_user_intent = None
-    for entry in reversed(history):
-        if entry.get("role") == "user":
-            last_user_intent = entry.get("intent")
-            break
-
-    # 1) Wiederbegrüßung
-    if intent == "greeting" and history:
-        variants = [
-            "Hey, da bist du wieder 😄 Was liegt an?",
-            "Willkommen zurück! Was möchtest du diesmal angehen?",
-            "Hi again! Wollen wir da weitermachen, wo wir aufgehört haben?",
-        ]
-        return random.choice(variants)
-
-    # 2) Smalltalk nach Work/Feelings/Relations – weicher Übergang
-    if intent == "smalltalk" and last_user_intent in ("work", "feelings", "personal_relations"):
-        return (
-            answer
-            + " Und falls du über das Thema von eben noch weiterreden willst, bin ich auch dabei."
-        )
-
-    # 3) Work nach Feelings – etwas empathischer Einstieg
-    if intent == "work" and last_user_intent == "feelings":
-        return (
-            "Okay, schauen wir mal auf die Arbeit, wenn sie so viel Raum einnimmt. "
+    # Beispiel: Wenn der User gerade sehr gestresst ist, ton etwas softer machen
+    last_user_msgs = [h for h in history if h.get("role") == "user"]
+    if intent in ("stress", "feelings", "work_situation", "relationship") and last_user_msgs:
+        answer = (
+            "Ich höre, dass dich das wirklich beschäftigt. "
             + answer
         )
 
-    # 4) Personal Relations nach Work/Feelings – Hinweis auf Komplexität
-    if intent == "personal_relations" and last_user_intent in ("work", "feelings"):
-        return (
-            "Zwischenmenschliches hängt oft mit Stimmung und Alltag zusammen – "
-            + answer
+    # Bei wiederholten Unknowns: aktiv nachfragen
+    last_bot_unknowns = [
+        h for h in history[-6:]
+        if h.get("role") == "bot" and h.get("intent") == UNKNOWN_INTENT
+    ]
+    if intent == UNKNOWN_INTENT and len(last_bot_unknowns) >= 1:
+        answer += (
+            " Wenn du möchtest, kannst du mir kurz in einem Satz sagen, "
+            "worum es dir vor allem geht (z.B. Arbeit, Gefühle, Technik)."
         )
 
     return answer
 
 
-# Optional: CLI-Chat zum Testen
-if __name__ == "__main__":
-    print("Local Chatbot (CLI). Zum Beenden 'quit' eingeben.")
-    session_history: List[Dict[str, Any]] = []
-    while True:
-        msg = input("Du: ").strip()
-        if msg.lower() in ("quit", "exit"):
-            break
-        ans, intent, conf = generate_response(msg)
-        ans = tweak_answer_with_context(ans, intent, session_history)
-        print(f"Bot [{intent} ({conf:.2f})]: {ans}")
-        session_history.append(
-            {"role": "user", "text": msg, "intent": intent, "confidence": conf}
-        )
-        session_history.append(
-            {"role": "bot", "text": ans, "intent": intent, "confidence": conf}
-        )
-        log_message(msg, ans, intent, note=f"conf={conf:.3f};cli=1")
+# ==============================
+# Antwortbausteine / Knowledge-Base
+# ==============================
+
+def answer_greeting() -> str:
+    return "Hey 👋 Was liegt an? Frag mich einfach, womit ich dir helfen soll – Technik, Arbeit, Gefühle, irgendwas."
+
+
+def answer_goodbye() -> str:
+    return "Alles klar, wir hören uns! 👋 Wenn du wieder was brauchst – einfach schreiben."
+
+
+def answer_thanks() -> str:
+    return "Gerne doch! 😊 Wenn du magst, kannst du direkt mit der nächsten Frage weitermachen."
+
+
+def answer_how_are_you() -> str:
+    return "Ich funktioniere tadellos 😄 Wichtiger: Was geht bei dir gerade ab?"
+
+
+def answer_stress() -> str:
+    return (
+        "Okay, Stresslevel scheint hoch zu sein 😅 Lass uns das sortieren:\n"
+        "1. Worum geht es hauptsächlich (Arbeit, privat, etwas anderes)?\n"
+        "2. Was wäre heute ein kleiner, realistischer Schritt, den du schaffen könntest?\n"
+        "Erzähl mir kurz Punkt 1, dann überlegen wir zusammen die nächsten Schritte."
+    )
+
+
+def answer_feelings() -> str:
+    return (
+        "Danke, dass du das teilst. ❤️ Ich bin keine Therapeutin, aber ich kann dir helfen, "
+        "deine Gedanken zu sortieren, Optionen zu sehen oder Formulierungen zu finden. "
+        "Magst du mir in 1–2 Sätzen sagen, was dich gerade am meisten belastet?"
+    )
+
+
+def answer_relationship() -> str:
+    return (
+        "Herzthemen sind immer tricky 🫠 Ich kann dir z.B. helfen bei:\n"
+        "- Formulierungen für Nachrichten\n"
+        "- Sortieren, was du willst\n"
+        "- Wie du etwas respektvoll ansprichst\n\n"
+        "Erzähl mir kurz: Was ist die Situation, sehr grob zusammengefasst?"
+    )
+
+
+def answer_work_situation() -> str:
+    return (
+        "Arbeit kann echt Energie fressen. Lass uns kurz strukturieren:\n"
+        "1. Was nervt dich am meisten?\n"
+        "2. Was läuft noch okay oder sogar gut?\n"
+        "3. Was könntest du konkret innerhalb der nächsten Woche verändern?\n"
+        "Schreib mir erst mal Punkt 1, dann bauen wir darauf auf."
+    )
+
+
+def answer_motivation() -> str:
+    return (
+        "Okay, wir werfen den Motivationsmotor an 🔥\n"
+        "Sag mir eine Sache, die du heute schaffen willst. "
+        "Nur eine. Dann brechen wir die in Mini-Schritte runter."
+    )
+
+
+def answer_decision_help() -> str:
+    return (
+        "Entscheidungen sind nervig, weil man immer irgendwas verliert. "
+        "Wir können es so angehen:\n"
+        "1. Welche 2–3 Optionen hast du?\n"
+        "2. Was spricht jeweils dafür und dagegen?\n"
+        "3. Was wäre die Worst-Case-Folge jeder Option?\n\n"
+        "Schreib mir kurz deine Optionen, dann füllen wir die Liste gemeinsam."
+    )
+
+
+def answer_python_help(user_text: str) -> str:
+    return (
+        "Klar, Python geht immer 🐍\n"
+        "Schick mir am besten:\n"
+        "- den relevanten Codeausschnitt und\n"
+        "- die Fehlermeldung (falls vorhanden).\n\n"
+        "Dann erkläre ich dir Schritt für Schritt, was da schief läuft oder wie du es bauen kannst."
+    )
+
+
+def answer_web_dev() -> str:
+    kb = knowledge_base.get("flask", "")
+    extra = f"\n\nKleiner Kontext zu Flask:\n{kb}" if kb else ""
+    return (
+        "Webentwicklung kann vieles bedeuten – Frontend, Backend oder beides.\n"
+        "Sag mir kurz, ob es um HTML/CSS/JS, Flask/Backend oder Deployment geht – "
+        "dann kann ich gezielter helfen."
+        + extra
+    )
+
+
+def answer_ai_explanation() -> str:
+    kb = knowledge_base.get("künstliche intelligenz", "") or knowledge_base.get("ki", "")
+    if kb:
+        return kb
+    return (
+        "Künstliche Intelligenz (KI) bedeutet, dass Computer Aufgaben lösen, "
+        "für die man normalerweise menschliche Intelligenz bräuchte – z.B. Sprache verstehen, "
+        "Bilder erkennen oder Entscheidungen treffen. Oft lernt ein Modell aus Beispielen "
+        "und generalisiert dann auf neue Situationen."
+    )
+
+
+def answer_definition(user_text: str) -> str:
+    lower = user_text.lower()
+    for key, value in knowledge_base.items():
+        if key.lower() in lower:
+            return f"Defintion von **{key}**:\n{value}"
+    return (
+        "Sag mir bitte konkret, wovon du eine Definition möchtest "
+        "(z.B. 'Definition von Flask', 'Definition von Machine Learning')."
+    )
+
+
+def answer_explain_like_5(user_text: str) -> str:
+    return (
+        "Okay, wir gehen auf 'Erklär es wie für ein Kind'-Level 😄\n"
+        "Schreib mir bitte nochmal genau, welchen Begriff oder welches Thema ich erklären soll."
+    )
+
+
+def answer_comparison(user_text: str) -> str:
+    return (
+        "Vergleiche kann ich gut machen. Schreib mir bitte nochmal im Format:\n"
+        "'Vergleiche X und Y' – z.B. 'Vergleiche Flask und Django' – "
+        "dann stelle ich dir die wichtigsten Unterschiede gegenüber."
+    )
+
+
+def answer_pros_cons(user_text: str) -> str:
+    return (
+        "Vor- und Nachteile lassen sich gut in eine Liste packen. "
+        "Sag mir, wovon du die Pros & Cons möchtest (z.B. 'Remote-Arbeit', 'KI im Unternehmen', 'Docker'), "
+        "dann bastle ich dir eine Übersicht."
+    )
+
+
+def answer_step_by_step(user_text: str) -> str:
+    return (
+        "Gerne Schritt für Schritt ✅\n"
+        "Schreib mir bitte, welche Aufgabe oder welches Ziel du genau hast, "
+        "dann packe ich dir das in nummerierte Schritte."
+    )
+
+
+def answer_what_can_you_do() -> str:
+    return (
+        "Ich kann dir helfen bei:\n"
+        "- Fragen zu Technik (Python, Web, KI, Deployment)\n"
+        "- Strukturieren von Gedanken (Arbeit, Gefühle, Entscheidungen)\n"
+        "- Erklärungen (Definitionen, Vergleiche, Schritt-für-Schritt-Anleitungen)\n"
+        "- deinem eigenen KI-/Chatbot-Projekt (so wie dieser Bot 😉)\n\n"
+        "Frag mich einfach konkret nach deinem nächsten Thema."
+    )
+
+
+def answer_training_info() -> str:
+    return (
+        "Ich bin ein klassifikationsbasierter Chatbot:\n"
+        "- Ich nutze TF-IDF + Logistic Regression für Intenterkennung.\n"
+        "- Meine Trainingsdaten kommen aus festen Beispielen, einer training_data.json "
+        "und – wenn du das nutzt – aus geloggten Gesprächen.\n"
+        "- Alles läuft lokal bzw. in deiner Railway-Umgebung ohne externe KI-API."
+    )
+
+
+def answer_ki_programming() -> str:
+    kb = knowledge_base.get("eigene ki programmieren", "")
+    base = (
+        "Eigene KI programmieren läuft grob so ab:\n"
+        "1. Problem definieren (z.B. Text klassifizieren, Chatbot, Empfehlungssystem).\n"
+        "2. Daten sammeln und beschriften.\n"
+        "3. Ein Modell wählen (z.B. Logistic Regression, Random Forest, Neurales Netz).\n"
+        "4. Features bauen (z.B. TF-IDF bei Texten).\n"
+        "5. Modell trainieren, validieren, verbessern.\n"
+        "6. Modell in eine App einbauen (z.B. Flask-API).\n\n"
+        "Du hast mit diesem Projekt schon wirklich viel davon umgesetzt 👌\n"
+        "Wenn du magst, können wir Schritt für Schritt das nächste Level planen "
+        "(z.B. besseres Modell, mehr Intents, Daten-Cleanup, CI/CD)."
+    )
+    if kb:
+        return kb + "\n\n" + base
+    return base
+
+
+def answer_unknown(user_text: str, confidence: float) -> str:
+    return (
+        "Ich bin mir da gerade nicht sicher 🤔\n"
+        "Formulier deine Frage bitte etwas konkreter oder sag mir kurz, "
+        "ob es um Technik, Arbeit oder etwas Persönliches geht."
+    )
+
+
+# ==============================
+# Hauptfunktion: generate_response
+# ==============================
+
+def generate_response(user_text: str) -> Tuple[str, str, float]:
+    """
+    Nimmt den User-Text, bestimmt Intent + Confidence und
+    erzeugt eine passende Antwort.
+
+    Rückgabe: (answer, intent, confidence)
+    """
+    user_text = (user_text or "").strip()
+    if not user_text:
+        return "Sag ruhig was, dann kann ich antworten 😊", UNKNOWN_INTENT, 0.0
+
+    intent, confidence = predict_intent(user_text)
+
+    # Router: Intent → Antwortlogik
+    if intent == "greeting":
+        answer = answer_greeting()
+    elif intent == "goodbye":
+        answer = answer_goodbye()
+    elif intent == "thanks":
+        answer = answer_thanks()
+    elif intent == "how_are_you":
+        answer = answer_how_are_you()
+    elif intent in ("stress",):
+        answer = answer_stress()
+    elif intent in ("feelings",):
+        answer = answer_feelings()
+    elif intent in ("relationship",):
+        answer = answer_relationship()
+    elif intent in ("work_situation",):
+        answer = answer_work_situation()
+    elif intent in ("motivation",):
+        answer = answer_motivation()
+    elif intent in ("decision_help",):
+        answer = answer_decision_help()
+    elif intent in ("python_help",):
+        answer = answer_python_help(user_text)
+    elif intent in ("web_dev",):
+        answer = answer_web_dev()
+    elif intent in ("ai_explanation",):
+        answer = answer_ai_explanation()
+    elif intent in ("definition",):
+        answer = answer_definition(user_text)
+    elif intent in ("explain_like_5",):
+        answer = answer_explain_like_5(user_text)
+    elif intent in ("comparison",):
+        answer = answer_comparison(user_text)
+    elif intent in ("pros_cons",):
+        answer = answer_pros_cons(user_text)
+    elif intent in ("step_by_step",):
+        answer = answer_step_by_step(user_text)
+    elif intent in ("what_can_you_do",):
+        answer = answer_what_can_you_do()
+    elif intent in ("training_info",):
+        answer = answer_training_info()
+    elif intent in ("ki_programming",):
+        answer = answer_ki_programming()
+    else:
+        # Fallback: unknown oder nicht explizit gemappter Intent
+        answer = answer_unknown(user_text, confidence)
+        intent = UNKNOWN_INTENT
+
+    return answer, intent, confidence
