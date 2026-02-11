@@ -166,10 +166,10 @@ def train_model(train_data: List[Tuple[str, str]]) -> Tuple[TfidfVectorizer, Log
     )
     X = vectorizer.fit_transform(texts)
 
+    # Kompatible Variante für ältere scikit-learn Versionen
     model = LogisticRegression(
-        max_iter=1000,
-        n_jobs=1,
-        multi_class="auto",
+        max_iter=1000
+        # keine multi_class / n_jobs explizit setzen → Default verwenden
     )
     model.fit(X, intents)
     return vectorizer, model
