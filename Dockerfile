@@ -1,37 +1,22 @@
-# Schlankes Python-Image
 FROM python:3.11-slim
 
-# System-Dependencies für scikit-learn / numpy
-RUN apt-get update && apt-get install -y \
+# Basisverzeichnis
+WORKDIR /app
+
+# System-Dependencies (optional minimal)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
-# Arbeitsverzeichnis
-WORKDIR /app
-
-# Requirements zuerst kopieren (für besseren Cache)
-COPY requirements.txt .
-
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Restliche Dateien
-COPY . .
-
-# Standard-Port für Flask
-EXPOSE 5000
-
-# Environment, damit Flask im Container korrekt läuft
-ENV PYTHONUNBUFFERED=1
-
-WORKDIR /app
+# Python-Abhängigkeiten
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Projektcode
 COPY . .
 
-# data-Verzeichnis sicherstellen (zur Sicherheit)
-RUN mkdir -p /app/data
+# Default-Port (wird von $PORT überschrieben)
+ENV PORT=8000
 
-EXPOSE 5000
-ENV PYTHONUNBUFFERED=1
-
-CMD ["python", "app.py"] 
+# Gunicorn als WSGI-Server nutzen (statt app.run)
+CMD ["sh", "-c", "gunicorn -b 0.0.0.0:${PORT:-8000} app:app"]
