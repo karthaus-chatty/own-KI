@@ -169,7 +169,8 @@
       <div class="error">{{ error }}</div>
     {% endif %}
 
-    <form method="post">
+    <!-- WICHTIG: action="/login" + method="post" -->
+    <form method="post" action="/login">
       <div>
         <label for="username">Benutzername</label>
         <input id="username" name="username" type="text" autocomplete="username" required />
@@ -182,7 +183,8 @@
     </form>
 
     <div class="hint">
-      Standard: Benutzername <code>user</code>, Passwort <code>changeme</code> – am besten per Umgebungsvariablen ändern.
+      Standard: Benutzername <code>user</code>, Passwort <code>changeme</code><br />
+      Am besten per Umgebungsvariablen <code>APP_USER</code> und <code>APP_PASSWORD</code> ändern.
     </div>
   </div>
 

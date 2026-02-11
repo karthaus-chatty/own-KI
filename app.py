@@ -1,13 +1,8 @@
-# app.py – Voll-App mit Auth, Admin, Logging & Session-Kontext
+# app.py – Voll-App mit Login, Admin, Logging & Session-Kontext
 
 import os
 import base64
 import uuid
-
-APP_USER = os.getenv("APP_USER") or "user"
-APP_PASSWORD = os.getenv("APP_PASSWORD") or "changeme"
-
-
 from functools import wraps
 from typing import Optional
 
@@ -40,12 +35,23 @@ from export_unknowns import export_unknowns
 from train_from_logs import train_model_from_all_data
 
 # ===============================
-# Admin-Auth
+# Konfiguration
 # ===============================
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") or "test123"
-print(f"[DEBUG] Voll-App gestartet. ADMIN_PASSWORD = {ADMIN_PASSWORD!r}")
 
+# Login für Frontend (Chat/Admin)
+APP_USER = os.getenv("APP_USER") or "user"
+APP_PASSWORD = os.getenv("APP_PASSWORD") or "changeme"
+
+print(f"[DEBUG] Voll-App gestartet.")
+print(f"[DEBUG] ADMIN_PASSWORD gesetzt (Länge): {len(ADMIN_PASSWORD)}")
+print(f"[DEBUG] APP_USER: {APP_USER!r}")
+
+
+# ===============================
+# Admin-Auth (Basic Auth für /admin)
+# ===============================
 
 def check_auth(auth_header: Optional[str]) -> bool:
     if not auth_header:
@@ -90,11 +96,12 @@ def requires_auth(f):
 
 
 # ===============================
-# Frontend-Login (für Chat & Admin)
+# Frontend-Login (Session-basiert)
 # ===============================
 
 def is_logged_in() -> bool:
     return bool(session.get("logged_in"))
+
 
 def login_user(username: str):
     session["logged_in"] = True
@@ -103,15 +110,18 @@ def login_user(username: str):
 
 def logout_user():
     session.pop("logged_in", None)
-    session.pop("history", None)  # optional: History löschen beim Logout
+    session.pop("history", None)
     session.pop("username", None)
+
 
 def requires_login(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
         if not is_logged_in():
+            # Kein Redirect-Loop, einfach Login anzeigen
             return render_template("login.html", error=None), 401
         return view_func(*args, **kwargs)
+
     return wrapper
 
 
@@ -125,6 +135,7 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY") or "change-me-dev-secret"
 
 @app.before_request
 def ensure_session():
+    # Session-ID & History einmalig anlegen
     if "session_id" not in session:
         session["session_id"] = str(uuid.uuid4())
         session["history"] = []
@@ -132,7 +143,7 @@ def ensure_session():
 
 
 # ===============================
-# Routen
+# Login / Logout Routen
 # ===============================
 
 @app.route("/login", methods=["GET", "POST"])
@@ -141,10 +152,14 @@ def login():
         username = (request.form.get("username") or "").strip()
         password = (request.form.get("password") or "").strip()
 
+        print(f"[DEBUG] Login-Versuch: username={username!r}")
+
         if username == APP_USER and password == APP_PASSWORD:
             login_user(username)
-            return redirect("/")  # nach erfolgreichem Login zum Chat
+            print(f"[DEBUG] Login erfolgreich für {username!r}")
+            return redirect("/")
         else:
+            print(f"[DEBUG] Login FEHLGESCHLAGEN für {username!r}")
             return render_template("login.html", error="Falscher Benutzername oder Passwort."), 401
 
     # GET
@@ -153,8 +168,14 @@ def login():
 
 @app.route("/logout")
 def logout():
+    print("[DEBUG] Logout aufgerufen")
     logout_user()
     return redirect("/login")
+
+
+# ===============================
+# Routen – Chat & API
+# ===============================
 
 @app.route("/")
 @requires_login
@@ -164,6 +185,7 @@ def index():
 
 
 @app.route("/api/chat", methods=["POST"])
+@requires_login
 def api_chat():
     data = request.get_json() or {}
     user_text = (data.get("message") or "").strip()
@@ -203,11 +225,14 @@ def api_chat():
 
 
 @app.route("/api/intents", methods=["GET"])
+@requires_login
 def api_intents():
     return jsonify({"intents": sorted(known_intents)})
 
 
-# ---------- Admin-Routen ----------
+# ===============================
+# Admin-Routen
+# ===============================
 
 @app.route("/admin")
 @requires_login
@@ -215,17 +240,19 @@ def api_intents():
 def admin_dashboard():
     print("[DEBUG] /admin aufgerufen – Auth ok")
     rows = load_logs()
+    username = session.get("username", "")
+
     if not rows:
         return render_template(
-        "admin.html",
-        no_logs=True,
-        basic=None,
-        intents=None,
-        per_day=None,
-        examples=None,
-        top_overall=None,
-        top_per_intent=None,
-        username=session.get("username", ""),
+            "admin.html",
+            no_logs=True,
+            basic=None,
+            intents=None,
+            per_day=None,
+            examples=None,
+            top_overall=None,
+            top_per_intent=None,
+            username=username,
         )
 
     basic = compute_basic_stats(rows)
@@ -244,10 +271,12 @@ def admin_dashboard():
         examples=examples,
         top_overall=top_overall,
         top_per_intent=top_per_intent,
+        username=username,
     )
 
 
 @app.route("/admin/export_unknowns", methods=["POST"])
+@requires_login
 @requires_auth
 def admin_export_unknowns():
     print("[DEBUG] /admin/export_unknowns aufgerufen")
@@ -257,6 +286,7 @@ def admin_export_unknowns():
 
 
 @app.route("/admin/train", methods=["POST"])
+@requires_login
 @requires_auth
 def admin_train():
     print("[DEBUG] /admin/train aufgerufen")
@@ -278,9 +308,11 @@ def admin_train():
         ), 500
 
 
-if __name__ == "__main__":
-    import os
+# ===============================
+# Main
+# ===============================
 
+if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     print(f"[DEBUG] Starte Voll-Flask-App auf http://0.0.0.0:{port}")
     app.run(debug=False, host="0.0.0.0", port=port)
