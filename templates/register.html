@@ -2,7 +2,7 @@
 <html lang="de" data-theme="light">
 <head>
   <meta charset="UTF-8" />
-  <title>Login • Chatbot</title>
+  <title>Registrieren • Chatbot</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
@@ -117,12 +117,12 @@
     button {
       margin-top: 4px;
       border-radius: 999px;
-      border: 1px solid #16a34a;
+      border: 1px solid #6366f1;
       padding: 8px 12px;
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
-      background: linear-gradient(135deg, #16a34a, #22c55e);
+      background: linear-gradient(135deg, #6366f1, #22d3ee);
       color: #020617;
       width: 100%;
     }
@@ -171,28 +171,27 @@
 
   <div class="card">
     <div class="logo-pill">C</div>
-    <h1>Login</h1>
-    <p>Bitte melde dich an, um den Chatbot zu nutzen.</p>
+    <h1>Registrieren</h1>
+    <p>Lege einen Account an, um den Chatbot zu nutzen.</p>
 
     {% if error %}
       <div class="error">{{ error }}</div>
     {% endif %}
 
-    <form method="post" action="/login">
+    <form method="post" action="/register">
       <div>
         <label for="username">Benutzername</label>
         <input id="username" name="username" type="text" autocomplete="username" required />
       </div>
       <div>
         <label for="password">Passwort</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <input id="password" name="password" type="password" autocomplete="new-password" required />
       </div>
-      <button type="submit">Anmelden</button>
+      <button type="submit">Account erstellen</button>
     </form>
 
     <div class="hint">
-      Noch keinen Account? <a href="/register">Jetzt registrieren</a>.<br />
-      Standard-User (falls keiner registriert wurde): Benutzername <code>user</code>, Passwort <code>changeme</code>.
+      Du hast bereits einen Account? <a href="/login">Zum Login</a>.
     </div>
   </div>
 

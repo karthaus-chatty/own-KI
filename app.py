@@ -1,8 +1,9 @@
-# app.py – Voll-App mit Login, Admin, Logging & Session-Kontext
+# app.py – Voll-App mit Login, Registrierung, Admin, Logging & Session-Kontext
 
 import os
 import base64
 import uuid
+import json
 from functools import wraps
 from typing import Optional
 
@@ -15,6 +16,8 @@ from flask import (
     session,
     redirect,
 )
+
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from chatbot import (
     generate_response,
@@ -35,18 +38,91 @@ from export_unknowns import export_unknowns
 from train_from_logs import train_model_from_all_data
 
 # ===============================
-# Konfiguration
+# Pfade & Konfiguration
 # ===============================
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+USERS_FILE = os.path.join(DATA_DIR, "users.json")
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") or "test123"
 
-# Login für Frontend (Chat/Admin)
+# Login für Frontend (Default-User, wird beim ersten Start angelegt)
 APP_USER = os.getenv("APP_USER") or "user"
 APP_PASSWORD = os.getenv("APP_PASSWORD") or "changeme"
 
 print(f"[DEBUG] Voll-App gestartet.")
 print(f"[DEBUG] ADMIN_PASSWORD gesetzt (Länge): {len(ADMIN_PASSWORD)}")
 print(f"[DEBUG] APP_USER: {APP_USER!r}")
+
+
+# ===============================
+# User-Verwaltung (Registrierung)
+# ===============================
+
+def load_users():
+    if not os.path.exists(USERS_FILE):
+        return []
+    try:
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("users", [])
+    except Exception as e:
+        print(f"[DEBUG] Konnte users.json nicht lesen: {e}")
+        return []
+
+
+def save_users(users):
+    try:
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump({"users": users}, f, ensure_ascii=False, indent=2)
+        print(f"[DEBUG] {len(users)} User in users.json gespeichert.")
+    except Exception as e:
+        print(f"[DEBUG] Konnte users.json nicht schreiben: {e}")
+
+
+def ensure_default_user():
+    users = load_users()
+    for u in users:
+        if u.get("username") == APP_USER:
+            print("[DEBUG] Default-User existiert bereits.")
+            return
+    # Default-User anlegen
+    hashed = generate_password_hash(APP_PASSWORD)
+    users.append({"username": APP_USER, "password_hash": hashed})
+    save_users(users)
+    print(f"[DEBUG] Default-User {APP_USER!r} angelegt.")
+
+
+def find_user(username: str):
+    users = load_users()
+    for u in users:
+        if u.get("username", "").lower() == username.lower():
+            return u
+    return None
+
+
+def register_user(username: str, password: str) -> tuple[bool, str]:
+    username = username.strip()
+    if not username or not password:
+        return False, "Benutzername und Passwort dürfen nicht leer sein."
+
+    if len(username) < 3:
+        return False, "Benutzername muss mindestens 3 Zeichen lang sein."
+    if len(password) < 4:
+        return False, "Passwort muss mindestens 4 Zeichen lang sein."
+
+    users = load_users()
+    for u in users:
+        if u.get("username", "").lower() == username.lower():
+            return False, "Benutzername ist bereits vergeben."
+
+    hashed = generate_password_hash(password)
+    users.append({"username": username, "password_hash": hashed})
+    save_users(users)
+    return True, "Benutzer erfolgreich angelegt."
 
 
 # ===============================
@@ -71,7 +147,7 @@ def check_auth(auth_header: Optional[str]) -> bool:
         return False
 
     ok = password == ADMIN_PASSWORD
-    print(f"[DEBUG] Passwort korrekt? {ok}")
+    print(f"[DEBUG] Admin-Passwort korrekt? {ok}")
     return ok
 
 
@@ -118,8 +194,7 @@ def requires_login(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
         if not is_logged_in():
-            # Kein Redirect-Loop, einfach Login anzeigen
-            return render_template("login.html", error=None), 401
+            return redirect("/login")
         return view_func(*args, **kwargs)
 
     return wrapper
@@ -132,6 +207,8 @@ def requires_login(view_func):
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY") or "change-me-dev-secret"
 
+ensure_default_user()
+
 
 @app.before_request
 def ensure_session():
@@ -143,7 +220,7 @@ def ensure_session():
 
 
 # ===============================
-# Login / Logout Routen
+# Login / Logout / Registrierung
 # ===============================
 
 @app.route("/login", methods=["GET", "POST"])
@@ -154,7 +231,8 @@ def login():
 
         print(f"[DEBUG] Login-Versuch: username={username!r}")
 
-        if username == APP_USER and password == APP_PASSWORD:
+        user = find_user(username)
+        if user and check_password_hash(user.get("password_hash", ""), password):
             login_user(username)
             print(f"[DEBUG] Login erfolgreich für {username!r}")
             return redirect("/")
@@ -164,6 +242,25 @@ def login():
 
     # GET
     return render_template("login.html", error=None)
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        password = (request.form.get("password") or "").strip()
+
+        ok, msg = register_user(username, password)
+        if ok:
+            print(f"[DEBUG] Neuer User registriert: {username!r}")
+            login_user(username)
+            return redirect("/")
+        else:
+            print(f"[DEBUG] Registrierung fehlgeschlagen für {username!r}: {msg}")
+            return render_template("register.html", error=msg), 400
+
+    # GET
+    return render_template("register.html", error=None)
 
 
 @app.route("/logout")

@@ -357,6 +357,19 @@
     margin-bottom: 10px;
   }
 
+  .profile-info {
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle);
+    background: rgba(15, 23, 42, 0.04);
+  }
+
+  :root[data-theme="dark"] .profile-info {
+    background: rgba(15, 23, 42, 0.7);
+  }
+
   </style>
 </head>
 <body>
@@ -372,6 +385,10 @@
         </div>
         <div class="header-right">
           <span class="badge-env">Admin-Area • lokal</span>
+          <span class="profile-info">
+            Eingeloggt als <strong>{{ username }}</strong>
+          </span>
+          <a href="/logout" class="link-back">Logout</a>
           <button id="theme-toggle" class="theme-toggle" type="button">🌙 Dunkel</button>
           <a href="/" class="link-back">← Zurück zum Chat</a>
         </div>
