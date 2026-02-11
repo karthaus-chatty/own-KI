@@ -425,6 +425,25 @@
   background: rgba(15, 23, 42, 0.7);
 }
 
+.intent-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.intent-pill {
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(15, 23, 42, 0.03);
+}
+
+:root[data-theme="dark"] .intent-pill {
+  background: rgba(15, 23, 42, 0.85);
+}
+
     /* ===== Bessere Abgrenzung im Darkmode (Chat) ===== */
 
   :root[data-theme="dark"] .content {
@@ -509,6 +528,9 @@
             </form>
             <div class="chat-hint">
               Nachrichten werden in <code>data/chatlog.csv</code> geloggt und können im Admin-Dashboard analysiert werden.
+            </div>
+            <div id="intent-hint" class="intent-hint">
+              <!-- Wird per JS gefüllt -->
             </div>
           </div>
         </div>
