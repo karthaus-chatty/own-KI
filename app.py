@@ -7,6 +7,9 @@ import uuid
 import json
 from functools import wraps
 from typing import Optional
+from typing import List, Dict, Any
+from sklearn.metrics.pairwise import cosine_similarity
+import csv
 
 from flask import (
     Flask,
@@ -28,6 +31,7 @@ from chatbot import (
     tweak_answer_with_context,
     debug_intent_analysis,
     get_intent_example_counts,
+    find_similar_examples,
 )
 from analyze_logs import (
     load_logs,
@@ -628,6 +632,28 @@ def admin_annotate():
         }
     )
 
+@app.route("/admin/similar_examples", methods=["POST"])
+@requires_login
+@requires_auth
+def admin_similar_examples():
+    """
+    Nimmt einen Text entgegen und liefert ähnliche Trainingsbeispiele zurück.
+    Wird im Admin-Unknown-Panel genutzt, um beim Labeln zu helfen.
+    """
+    data = request.get_json() or {}
+    text = (data.get("text") or "").strip()
+
+    if not text:
+        return jsonify({"ok": False, "message": "Kein Text übergeben."}), 400
+
+    try:
+        examples = find_similar_examples(text, top_n=5)
+    except Exception as e:
+        print(f"[admin_similar_examples] Fehler: {e}")
+        return jsonify({"ok": False, "message": "Fehler bei der Ähnlichkeitssuche."}), 500
+
+    return jsonify({"ok": True, "examples": examples})
+
 @app.route("/api/feedback", methods=["POST"])
 def api_feedback():
     """
@@ -757,6 +783,90 @@ def api_chat():
             "mode": mode,
         }
     )
+def get_training_examples_for_similarity() -> List[Dict[str, str]]:
+    """
+    Liefert eine Liste von Trainingsbeispielen für Similarity-Suche.
+    Quelle:
+    - base_train_data (Code-basis)
+    - data/training_data.json (manuell gelabelt im Admin)
+
+    Struktur je Eintrag:
+    { "text": "...", "intent": "..." }
+    """
+    examples: List[Dict[str, str]] = []
+
+    # Basisdaten aus dem Code
+    for text, intent in base_train_data:
+        t = (text or "").strip()
+        i = (intent or "").strip()
+        if not t or not i:
+            continue
+        examples.append({"text": t, "intent": i})
+
+    # Zusätzliche Daten aus training_data.json
+    if os.path.exists(TRAINING_JSON):
+        try:
+            with open(TRAINING_JSON, "r", encoding="utf-8") as f:
+                payload = json.load(f) or {}
+            for item in payload.get("data", []):
+                t = (item.get("text") or "").strip()
+                i = (item.get("intent") or "").strip()
+                if not t or not i:
+                    continue
+                examples.append({"text": t, "intent": i})
+        except Exception as e:
+            print(f"[similarity] Konnte training_data.json nicht lesen: {e}")
+
+    # Du könntest hier optional auch gelabelte Logs ergänzen.
+    # Für den Anfang reicht Basis + JSON meist völlig.
+
+    return examples
+
+
+def find_similar_examples(user_text: str, top_n: int = 5) -> List[Dict[str, Any]]:
+    """
+    Findet die Top-N ähnlichsten Trainingsbeispiele für einen gegebenen Text.
+    Nutzt den selben Vektorraum (vectorizer) wie das Modell.
+    Rückgabe: Liste von Dicts mit:
+        {
+          "text": "...",
+          "intent": "...",
+          "similarity": float  # 0..1
+        }
+    """
+    user_text = (user_text or "").strip()
+    if not user_text:
+        return []
+
+    examples = get_training_examples_for_similarity()
+    if not examples:
+        return []
+
+    vectorizer, model = load_model()
+
+    corpus_texts = [e["text"] for e in examples]
+    # Query + Corpus in EINEM Rutsch vektorisieren
+    X = vectorizer.transform([user_text] + corpus_texts)
+    q_vec = X[0:1]
+    corpus_vecs = X[1:]
+
+    sims = cosine_similarity(q_vec, corpus_vecs)[0]  # shape: (len(corpus),)
+
+    indexed = list(enumerate(sims))
+    indexed.sort(key=lambda x: x[1], reverse=True)
+
+    results: List[Dict[str, Any]] = []
+    for idx, score in indexed[:top_n]:
+        ex = examples[idx]
+        results.append(
+            {
+                "text": ex["text"],
+                "intent": ex["intent"],
+                "similarity": float(score),
+            }
+        )
+
+    return results
 
 # ===============================
 # Main

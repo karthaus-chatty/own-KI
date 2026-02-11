@@ -503,6 +503,15 @@
                         Zu Trainingsdaten
                       </button>
                       <div class="annot-row-status small-muted"></div>
+ 
+                      <button
+                        type="button"
+                        class="similar-btn"
+                        data-text="{{ row.user_text|e }}"
+                        style="margin-top:4px; font-size:11px; padding:2px 8px;"
+                      >
+                        Ähnliche
+                      </button>
                     </td>
                   </tr>
                   {% endfor %}
@@ -944,6 +953,72 @@
         } catch (err) {
           console.error(err);
           if (status) status.textContent = "Netzwerkfehler beim Speichern.";
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+    
+        // Similarity-Tool (Ähnliche Beispiele zu Unknown)
+    document.querySelectorAll(".similar-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const tr = btn.closest("tr");
+        if (!tr) return;
+
+        const status = tr.querySelector(".similar-row");
+        const text = btn.getAttribute("data-text") || "";
+
+        if (!text) {
+          if (status) status.textContent = "Kein Text gefunden.";
+          return;
+        }
+
+        if (status) status.textContent = "Suche ähnliche Beispiele...";
+        btn.disabled = true;
+
+        try {
+          const res = await fetch("/admin/similar_examples", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ text }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            if (status) {
+              status.textContent =
+                "Fehler: " + (data.message || "Ähnlichkeitssuche fehlgeschlagen.");
+            }
+            return;
+          }
+
+          const examples = data.examples || [];
+          if (!examples.length) {
+            if (status) status.textContent = "Keine ähnlichen Beispiele gefunden.";
+            return;
+          }
+
+          // Kleines Inline-Listing
+          const parts = examples.map((ex) => {
+            const s = typeof ex.similarity === "number"
+              ? (ex.similarity * 100).toFixed(1) + "%"
+              : "?";
+            const txt = (ex.text || "").length > 80
+              ? (ex.text || "").slice(0, 80) + "…"
+              : (ex.text || "");
+            return `${ex.intent} (${s}): ${txt}`;
+          });
+
+          if (status) {
+            status.innerHTML = parts
+              .map((p) => `<div>• ${p}</div>`)
+              .join("");
+          }
+        } catch (err) {
+          console.error(err);
+          if (status) status.textContent = "Netzwerkfehler bei der Ähnlichkeitssuche.";
         } finally {
           btn.disabled = false;
         }
