@@ -746,11 +746,24 @@
           html += `<div>Vorhersage: <strong>${a.predicted_intent}</strong> `
                + `(${(a.predicted_confidence * 100).toFixed(1)}%)</div>`;
 
+          if (typeof a.predicted_train_count === "number") {
+            html += `<div class="small-muted" style="margin-top:2px;">`
+                 + `Trainingsbeispiele für <code>${a.predicted_intent}</code>: `
+                 + `${a.predicted_train_count}</div>`;
+          }     
+
           if (Array.isArray(a.top) && a.top.length > 0) {
             html += `<div style="margin-top:4px;">Top-Intents:</div>`;
             html += `<ul style="margin:4px 0 0; padding-left:18px;">`;
             a.top.forEach(item => {
-              html += `<li>${item.intent} – ${(item.confidence * 100).toFixed(1)}%</li>`;
+              const trainCount =
+                typeof item.train_count === "number" ? item.train_count : null;
+              html += `<li>${item.intent} – `
+                   + `${(item.confidence * 100).toFixed(1)}%`;
+              if (trainCount !== null) {
+                html += ` (Trainingsbeispiele: ${trainCount})`;
+              }
+              html += `</li>`;
             });
             html += `</ul>`;
           }

@@ -233,6 +233,37 @@ def load_model():
     return vectorizer, model
 
 
+def get_intent_example_counts() -> Dict[str, int]:
+    """
+    Zählt, wie viele Trainingsbeispiele es pro Intent gibt.
+    Basis:
+    - base_train_data (im Code)
+    - data/training_data.json (falls vorhanden)
+
+    (Logs und unknowns.csv werden hier bewusst nicht berücksichtigt,
+    es ist eher ein Gefühl für die "explizit" gelabelten Beispiele.)
+    """
+    counts: Dict[str, int] = {}
+
+    # Basisdaten aus dem Code
+    for _, intent in base_train_data:
+        counts[intent] = counts.get(intent, 0) + 1
+
+    # Zusätzliche Daten aus training_data.json
+    if os.path.exists(TRAINING_JSON):
+        try:
+            with open(TRAINING_JSON, "r", encoding="utf-8") as f:
+                payload = json.load(f) or {}
+            for item in payload.get("data", []):
+                intent = (item.get("intent") or "").strip()
+                if intent:
+                    counts[intent] = counts.get(intent, 0) + 1
+        except Exception as e:
+            print(f"[chatbot] Konnte training_data.json für Counts nicht lesen: {e}")
+
+    return counts
+
+
 # ==============================
 # Intent-Vorhersage
 # ==============================
@@ -261,12 +292,15 @@ def debug_intent_analysis(user_text: str, top_n: int = 5) -> Dict[str, Any]:
     - predicted_intent (mit Unknown-Handling)
     - predicted_confidence (roh, ohne Unknown-Override)
     - top: Liste der Top-N Intents mit Confidence
+    - predicted_train_count: wie viele Trainingsbeispiele es für den vorhergesagten Intent gibt
+    - top[i].train_count: Beispiele pro Intent in der Top-Liste
     """
     user_text = (user_text or "").strip()
     if not user_text:
         return {
             "predicted_intent": UNKNOWN_INTENT,
             "predicted_confidence": 0.0,
+            "predicted_train_count": 0,
             "top": [],
         }
 
@@ -290,6 +324,7 @@ def debug_intent_analysis(user_text: str, top_n: int = 5) -> Dict[str, Any]:
         return {
             "predicted_intent": UNKNOWN_INTENT,
             "predicted_confidence": 0.0,
+            "predicted_train_count": 0,
             "top": [],
         }
 
@@ -300,9 +335,18 @@ def debug_intent_analysis(user_text: str, top_n: int = 5) -> Dict[str, Any]:
     if best_raw_conf < UNKNOWN_CONFIDENCE_THRESHOLD:
         predicted_intent = UNKNOWN_INTENT
 
+    # Trainings-Beispiel-Counts ergänzen
+    counts = get_intent_example_counts()
+    for item in top_list:
+        item_intent = item["intent"]
+        item["train_count"] = int(counts.get(item_intent, 0))
+
+    predicted_train_count = int(counts.get(predicted_intent, 0))
+
     return {
         "predicted_intent": predicted_intent,
         "predicted_confidence": best_raw_conf,
+        "predicted_train_count": predicted_train_count,
         "top": top_list,
     }
 
