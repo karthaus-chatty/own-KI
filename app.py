@@ -171,23 +171,6 @@ def requires_auth(f):
 
     return decorated
 
-@app.route("/admin/download_unknowns", methods=["GET"])
-@requires_login
-@requires_auth
-def admin_download_unknowns():
-    if not os.path.exists(UNKNOWN_FILE):
-        return (
-            "Die Datei unknowns.csv existiert noch nicht. "
-            "Bitte zuerst Unknown-Intents exportieren.",
-            404,
-        )
-    return send_file(
-        UNKNOWN_FILE,
-        as_attachment=True,
-        download_name="unknowns.csv",
-        mimetype="text/csv",
-    )
-
 
 # ===============================
 # Frontend-Login (Session-basiert)
@@ -291,6 +274,23 @@ def logout():
 # ===============================
 # Routen – Chat & API
 # ===============================
+
+@app.route("/admin/download_unknowns", methods=["GET"])
+@requires_login
+@requires_auth
+def admin_download_unknowns():
+    if not os.path.exists(UNKNOWN_FILE):
+        return (
+            "Die Datei unknowns.csv existiert noch nicht. "
+            "Bitte zuerst Unknown-Intents exportieren.",
+            404,
+        )
+    return send_file(
+        UNKNOWN_FILE,
+        as_attachment=True,
+        download_name="unknowns.csv",
+        mimetype="text/csv",
+    )
 
 @app.route("/")
 @requires_login
