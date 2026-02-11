@@ -477,6 +477,24 @@
         {% if not no_logs %}
           <div class="card">
             <div class="card-header">
+              <div class="card-title">Intent-Debug</div>
+                <div class="card-subtitle">Text eingeben und Klassifikation prüfen</div>
+                </div>
+                <div>
+                  <textarea id="debug-intent-input"
+                    rows="3"
+                    style="width:100%; border-radius:10px; border:1px solid var(--border-subtle); padding:6px; font-size:13px; background:var(--bg-card); color:var(--text-main);"></textarea>
+                      <div style="margin-top:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <button id="debug-intent-btn" type="button">
+                          Intent testen
+                        </button>
+                        <span class="small-muted">
+                          Zeigt dir den erkannten Intent, Confidence und die Top-Alternativen.
+                        </span>
+                      </div>
+                      <div id="debug-intent-result" class="small-muted" style="margin-top:8px;"></div>
+                      </div>
+            </div>
               <div class="card-title">Nachrichten pro Tag</div>
               <div class="card-subtitle">Aktivitätsverlauf</div>
             </div>
@@ -611,6 +629,60 @@
     const exportStatus = document.getElementById("export-unknowns-status");
     const trainBtn = document.getElementById("train-model-btn");
     const trainStatus = document.getElementById("train-model-status");
+    const debugBtn = document.getElementById("debug-intent-btn");
+    const debugInput = document.getElementById("debug-intent-input");
+    const debugResult = document.getElementById("debug-intent-result");
+
+    if (debugBtn && debugInput && debugResult) {
+      debugBtn.addEventListener("click", async () => {
+        const text = debugInput.value.trim();
+        if (!text) {
+          debugResult.textContent = "Bitte gib einen Text ein.";
+          return;
+        }
+
+        debugResult.textContent = "Analysiere Intent...";
+        debugBtn.disabled = true;
+
+        try {
+          const res = await fetch("/admin/debug_intent", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ text }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            debugResult.textContent = "Fehler: " + (data.message || "Intent-Analyse fehlgeschlagen.");
+            return;
+          }
+
+          const a = data.analysis;
+          let html = "";
+
+          html += `<div>Vorhersage: <strong>${a.predicted_intent}</strong> `
+               + `(${(a.predicted_confidence * 100).toFixed(1)}%)</div>`;
+
+          if (Array.isArray(a.top) && a.top.length > 0) {
+            html += `<div style="margin-top:4px;">Top-Intents:</div>`;
+            html += `<ul style="margin:4px 0 0; padding-left:18px;">`;
+            a.top.forEach(item => {
+              html += `<li>${item.intent} – ${(item.confidence * 100).toFixed(1)}%</li>`;
+            });
+            html += `</ul>`;
+          }
+
+          debugResult.innerHTML = html;
+        } catch (err) {
+          console.error(err);
+          debugResult.textContent = "Netzwerkfehler bei der Intent-Analyse.";
+        } finally {
+          debugBtn.disabled = false;
+        }
+      });
+    }
 
     if (exportBtn) {
       exportBtn.addEventListener("click", async () => {

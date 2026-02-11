@@ -255,6 +255,57 @@ def predict_intent(user_text: str) -> Tuple[str, float]:
 
     return predicted_intent, confidence
 
+def debug_intent_analysis(user_text: str, top_n: int = 5) -> Dict[str, Any]:
+    """
+    Liefert Debug-Infos zur Intent-Vorhersage:
+    - predicted_intent (mit Unknown-Handling)
+    - predicted_confidence (roh, ohne Unknown-Override)
+    - top: Liste der Top-N Intents mit Confidence
+    """
+    user_text = (user_text or "").strip()
+    if not user_text:
+        return {
+            "predicted_intent": UNKNOWN_INTENT,
+            "predicted_confidence": 0.0,
+            "top": [],
+        }
+
+    vectorizer, model = load_model()
+    X = vectorizer.transform([user_text])
+    probs = model.predict_proba(X)[0]
+    intents = model.classes_
+
+    pairs = sorted(
+        zip(intents, probs),
+        key=lambda x: x[1],
+        reverse=True,
+    )
+
+    top_list = [
+        {"intent": intent, "confidence": float(conf)}
+        for intent, conf in pairs[:top_n]
+    ]
+
+    if not top_list:
+        return {
+            "predicted_intent": UNKNOWN_INTENT,
+            "predicted_confidence": 0.0,
+            "top": [],
+        }
+
+    best_raw_intent = top_list[0]["intent"]
+    best_raw_conf = top_list[0]["confidence"]
+
+    predicted_intent = best_raw_intent
+    if best_raw_conf < UNKNOWN_CONFIDENCE_THRESHOLD:
+        predicted_intent = UNKNOWN_INTENT
+
+    return {
+        "predicted_intent": predicted_intent,
+        "predicted_confidence": best_raw_conf,
+        "top": top_list,
+    }
+
 
 # ==============================
 # Logging

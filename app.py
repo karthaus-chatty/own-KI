@@ -25,6 +25,7 @@ from chatbot import (
     known_intents,
     log_message,
     tweak_answer_with_context,
+    debug_intent_analysis,
 )
 from analyze_logs import (
     load_logs,
@@ -420,6 +421,29 @@ def admin_train():
             {
                 "ok": False,
                 "message": f"Training fehlgeschlagen: {e}",
+            }
+        ), 500
+    
+@app.route("/admin/debug_intent", methods=["POST"])
+@requires_login
+@requires_auth
+def admin_debug_intent():
+    print("[DEBUG] /admin/debug_intent aufgerufen")
+    data = request.get_json() or {}
+    text = (data.get("text") or "").strip()
+
+    if not text:
+        return jsonify({"ok": False, "message": "Leerer Text."}), 400
+
+    try:
+        analysis = debug_intent_analysis(text, top_n=5)
+        return jsonify({"ok": True, "analysis": analysis})
+    except Exception as e:
+        print(f"[DEBUG] admin_debug_intent Fehler: {e}")
+        return jsonify(
+            {
+                "ok": False,
+                "message": f"Fehler bei der Intent-Analyse: {e}",
             }
         ), 500
 
