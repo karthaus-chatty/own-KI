@@ -604,6 +604,64 @@ def answer_unknown(user_text: str, confidence: float) -> str:
     )
 
 
+def get_training_examples_for_similarity() -> List[Dict[str, str]]:
+    """
+    Liefert eine Liste von Trainingsbeispielen für Similarity-Suche.
+    Quellen:
+    - base_train_data (Code-basis)
+    - data/training_data.json (manuell gelabelt im Admin)
+    - data/chatlog.csv (geloggte, bekannte Intents – unbekannte/unknown werden ignoriert)
+
+    Struktur je Eintrag:
+    { "text": "...", "intent": "..." }
+    """
+    examples: List[Dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add_example(text: str, intent: str):
+        t = (text or "").strip()
+        i = (intent or "").strip()
+        if not t or not i:
+            return
+        key = (t, i)
+        if key in seen:
+            return
+        seen.add(key)
+        examples.append({"text": t, "intent": i})
+
+    # 1) Basisdaten aus dem Code
+    for text, intent in base_train_data:
+        add_example(text, intent)
+
+    # 2) Zusätzliche Daten aus training_data.json
+    if os.path.exists(TRAINING_JSON):
+        try:
+            with open(TRAINING_JSON, "r", encoding="utf-8") as f:
+                payload = json.load(f) or {}
+            for item in payload.get("data", []):
+                add_example(item.get("text") or "", item.get("intent") or "")
+        except Exception as e:
+            print(f"[similarity] Konnte training_data.json nicht lesen: {e}")
+
+    # 3) Geloggte Daten aus chatlog.csv (nur bekannte Intents)
+    if os.path.exists(LOG_FILE):
+        try:
+            with open(LOG_FILE, "r", encoding="utf-8", newline="") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    t = (row.get("user_text") or "").strip()
+                    i = (row.get("intent") or "").strip()
+                    if not t or not i:
+                        continue
+                    if i == UNKNOWN_INTENT:
+                        continue
+                    add_example(t, i)
+        except Exception as e:
+            print(f"[similarity] Konnte chatlog.csv nicht lesen: {e}")
+
+    return examples
+
+
 # ==============================
 # Hauptfunktion: generate_response
 # ==============================

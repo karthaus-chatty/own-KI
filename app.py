@@ -187,6 +187,77 @@ def apply_knowledge(answer: str, intent: str) -> str:
     )
     return appended
 
+def load_feedback_stats() -> dict:
+    """
+    Liest data/feedback.csv ein und berechnet:
+    - total: Gesamtanzahl Feedbacks
+    - up: Anzahl Daumen hoch
+    - down: Anzahl Daumen runter
+    - by_intent: Liste von Dicts mit Intent-Stats:
+        {
+          "intent": "feelings",
+          "up": 10,
+          "down": 2,
+          "total": 12,
+          "up_percent": 83.3
+        }
+      sortiert nach up_percent aufsteigend (schlechteste zuerst).
+    """
+    stats = {
+        "total": 0,
+        "up": 0,
+        "down": 0,
+        "by_intent": [],
+    }
+
+    if not os.path.exists(FEEDBACK_FILE):
+        return stats
+
+    per_intent: dict[str, dict[str, int]] = {}
+
+    try:
+        with open(FEEDBACK_FILE, "r", encoding="utf-8", newline="") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) < 4:
+                    continue
+                # ts = row[0]
+                # text = row[1]
+                intent = (row[2] or "").strip() or "unknown"
+                rating = (row[3] or "").strip().lower()
+
+                if rating not in ("up", "down"):
+                    continue
+
+                stats["total"] += 1
+                stats[rating] += 1
+
+                bucket = per_intent.setdefault(intent, {"up": 0, "down": 0})
+                bucket[rating] += 1
+    except Exception as e:
+        print(f"[feedback] Fehler beim Lesen von feedback.csv: {e}")
+        return stats
+
+    for intent, d in per_intent.items():
+        total = d["up"] + d["down"]
+        if total <= 0:
+            continue
+        up_percent = (d["up"] / total) * 100.0
+        stats["by_intent"].append(
+            {
+                "intent": intent,
+                "up": d["up"],
+                "down": d["down"],
+                "total": total,
+                "up_percent": up_percent,
+            }
+        )
+
+    # Schlechteste zuerst (niedrigste up_percent)
+    stats["by_intent"].sort(key=lambda x: x["up_percent"])
+
+    return stats
+
 # ===============================
 # User-Verwaltung (Registrierung)
 # ===============================
@@ -446,6 +517,9 @@ def admin_dashboard():
     rows = load_logs()
     username = session.get("username", "")
 
+    # Feedback-Auswertung unabhängig von Logs laden
+    feedback_stats = load_feedback_stats()
+
     if not rows:
         return render_template(
             "admin.html",
@@ -458,6 +532,7 @@ def admin_dashboard():
             top_per_intent=None,
             recent_unknowns_list=[],
             intent_health=[],
+            feedback_stats=feedback_stats,
             username=username,
         )
 
@@ -523,6 +598,7 @@ def admin_dashboard():
         top_per_intent=top_per_intent,
         recent_unknowns_list=recent_unknowns_list,
         intent_health=health,
+        feedback_stats=feedback_stats,
         username=username,
     )
 
