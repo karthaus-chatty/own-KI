@@ -1,142 +1,168 @@
 # train_from_logs.py
+#
+# Trainiert das Intent-Modell aus:
+# - data/training_data.json (falls vorhanden)
+# - Basisdaten aus chatbot.base_train_data
+# - data/chatlog.csv (nur Zeilen mit Intent != 'unknown')
+# - data/unknowns.csv (nur Zeilen mit Intent != 'unknown', z.B. manuell gelabelte Unknowns)
+#
+# Ergebnis:
+# - Neues Modell + Vectorizer werden in data/model.pkl / data/vectorizer.pkl gespeichert
+
 import os
 import csv
 import json
+from typing import List, Tuple
 
 import joblib
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
 
-from chatbot import base_train_data  # nutzt dieselben Basis-Daten
+from chatbot import (
+    base_train_data,
+    train_model,
+    MODEL_FILE,
+    VECTORIZER_FILE,
+)
+
+# Pfade
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-LOG_FILE = os.path.join(DATA_DIR, "chatlog.csv")
-UNKNOWNS_FILE = os.path.join(DATA_DIR, "unknowns.csv")
-MODEL_FILE = os.path.join(DATA_DIR, "model.pkl")
-VECTORIZER_FILE = os.path.join(DATA_DIR, "vectorizer.pkl")
 TRAINING_JSON = os.path.join(DATA_DIR, "training_data.json")
+LOG_FILE = os.path.join(DATA_DIR, "chatlog.csv")
+UNKNOWN_FILE = os.path.join(DATA_DIR, "unknowns.csv")
 
 
-def load_json_training_data():
+def load_from_training_json() -> List[Tuple[str, str]]:
+    """
+    Lädt Trainingsdaten aus data/training_data.json, falls vorhanden.
+    Format:
+    {
+      "data": [
+        { "text": "...", "intent": "..." },
+        ...
+      ]
+    }
+    """
     if not os.path.exists(TRAINING_JSON):
-        print(f"[train] Keine '{TRAINING_JSON}' gefunden – überspringe JSON-Daten.")
+        print("[train_from_logs] Keine training_data.json gefunden – nutze nur Basisdaten + Logs.")
         return []
 
-    with open(TRAINING_JSON, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(TRAINING_JSON, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"[train_from_logs] Fehler beim Lesen von training_data.json: {e}")
+        return []
 
-    items = data.get("data", [])
-    result = []
-    for item in items:
+    items = []
+    for item in data.get("data", []):
         text = (item.get("text") or "").strip()
         intent = (item.get("intent") or "").strip()
-        if text and intent and intent != "unknown":
-            result.append((text, intent))
+        if text and intent:
+            items.append((text, intent))
 
-    print(f"[train] {len(result)} Beispiele aus training_data.json geladen.")
-    return result
+    print(f"[train_from_logs] {len(items)} Beispiele aus training_data.json geladen.")
+    return items
 
 
-def load_log_data():
-    if not os.path.exists(LOG_FILE):
-        print(f"[train] Keine Log-Datei '{LOG_FILE}' gefunden – überspringe Logs.")
+def load_from_csv(path: str, source_name: str) -> List[Tuple[str, str]]:
+    """
+    Liest Trainingsdaten aus einer CSV-Datei im Schema:
+      [timestamp, user_text, bot_answer, intent, note]
+    und nimmt nur Zeilen, bei denen:
+      - user_text nicht leer ist
+      - intent vorhanden ist
+      - intent != 'unknown'
+    """
+    if not os.path.exists(path):
+        print(f"[train_from_logs] {source_name}: Datei {path} nicht gefunden.")
         return []
 
-    result = []
-    with open(LOG_FILE, mode="r", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        for row in reader:
-            if len(row) < 4:
-                continue
-            _ts, user_text, _bot_answer, intent = row[:4]
-            user_text = (user_text or "").strip()
-            intent = (intent or "").strip()
-            if not user_text or not intent or intent == "unknown":
-                continue
-            result.append((user_text, intent))
-
-    print(f"[train] {len(result)} Beispiele aus chatlog.csv geladen.")
-    return result
-
-
-def load_labeled_unknowns():
-    if not os.path.exists(UNKNOWNS_FILE):
-        print(f"[train] Keine Datei '{UNKNOWNS_FILE}' gefunden – überspringe gelabelte Unknowns.")
+    items: List[Tuple[str, str]] = []
+    try:
+        with open(path, "r", encoding="utf-8", newline="") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) < 4:
+                    continue
+                user_text = (row[1] or "").strip()
+                intent = (row[3] or "").strip()
+                if not user_text or not intent:
+                    continue
+                if intent == "unknown":
+                    continue
+                items.append((user_text, intent))
+    except Exception as e:
+        print(f"[train_from_logs] Fehler beim Lesen von {source_name}: {e}")
         return []
 
-    result = []
-    with open(UNKNOWNS_FILE, mode="r", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        header = next(reader, None)
-        has_new_intent = False
-        if header and "new_intent" in header:
-            new_intent_idx = header.index("new_intent")
-            text_idx = header.index("user_text") if "user_text" in header else 1
-            has_new_intent = True
-        else:
-            # Fallback: feste Spaltenpositionen
-            new_intent_idx = 5
-            text_idx = 1
-
-        if not has_new_intent:
-            print("[train] Warnung: Header ohne 'new_intent' – nehme Spalte 5 als new_intent an.")
-
-        for row in reader:
-            if len(row) <= max(new_intent_idx, text_idx):
-                continue
-            user_text = (row[text_idx] or "").strip()
-            new_intent = (row[new_intent_idx] or "").strip()
-            if not user_text or not new_intent or new_intent == "unknown":
-                continue
-            result.append((user_text, new_intent))
-
-    print(f"[train] {len(result)} gelabelte Unknowns aus unknowns.csv geladen.")
-    return result
+    print(f"[train_from_logs] {source_name}: {len(items)} gültige Beispiele geladen.")
+    return items
 
 
-def train_model(train_data):
-    texts = [t for t, _ in train_data]
-    labels = [i for _, i in train_data]
+def collect_all_training_data() -> List[Tuple[str, str]]:
+    """
+    Sammelt alle Trainingsdaten aus:
+    - chatbot.base_train_data
+    - training_data.json
+    - chatlog.csv
+    - unknowns.csv (z.B. manuell gelabelte Unknowns)
+    """
+    all_data: List[Tuple[str, str]] = []
 
-    vectorizer = TfidfVectorizer(
-        ngram_range=(1, 2),
-        min_df=1,
-        max_df=0.95,
-    )
-    X = vectorizer.fit_transform(texts)
+    # 1) Basisdaten aus chatbot.py
+    print(f"[train_from_logs] Basisdaten aus chatbot.base_train_data: {len(base_train_data)}")
+    all_data.extend(base_train_data)
 
-    model = LogisticRegression(max_iter=1000)
-    model.fit(X, labels)
+    # 2) training_data.json
+    json_data = load_from_training_json()
+    all_data.extend(json_data)
 
-    return vectorizer, model
+    # 3) chatlog.csv
+    log_data = load_from_csv(LOG_FILE, "chatlog.csv")
+    all_data.extend(log_data)
+
+    # 4) unknowns.csv (nur, wenn du dort Intents manuell gesetzt hast)
+    unknown_data = load_from_csv(UNKNOWN_FILE, "unknowns.csv")
+    all_data.extend(unknown_data)
+
+    # Optional: einfache Dubletten-Entfernung (Text+Intent)
+    unique = {}
+    for text, intent in all_data:
+        key = (text, intent)
+        unique[key] = (text, intent)
+
+    deduped = list(unique.values())
+    print(f"[train_from_logs] Gesamt vor Dubletten: {len(all_data)}, nach Dubletten: {len(deduped)}")
+
+    return deduped
 
 
 def train_model_from_all_data():
-    train_data = list(base_train_data)
-
-    json_data = load_json_training_data()
-    train_data.extend(json_data)
-
-    log_data = load_log_data()
-    train_data.extend(log_data)
-
-    labeled_unknowns = load_labeled_unknowns()
-    train_data.extend(labeled_unknowns)
-
+    """
+    Hauptfunktion:
+    - sammelt alle Daten
+    - trainiert das Modell
+    - speichert model.pkl und vectorizer.pkl
+    """
+    train_data = collect_all_training_data()
     if not train_data:
-        raise RuntimeError("Keine Trainingsdaten vorhanden!")
+        raise RuntimeError("Keine Trainingsdaten gefunden – Training abgebrochen.")
 
-    print(f"[train] Gesamtanzahl Trainingsbeispiele: {len(train_data)}")
-
+    print(f"[train_from_logs] Starte Training mit {len(train_data)} Beispielen...")
     vectorizer, model = train_model(train_data)
+
     joblib.dump(model, MODEL_FILE)
     joblib.dump(vectorizer, VECTORIZER_FILE)
 
-    print(f"[train] Modell und Vektorisierer gespeichert in:\n  {MODEL_FILE}\n  {VECTORIZER_FILE}")
+    print(f"[train_from_logs] Training abgeschlossen.")
+    print(f"[train_from_logs] Modell gespeichert in: {MODEL_FILE}")
+    print(f"[train_from_logs] Vectorizer gespeichert in: {VECTORIZER_FILE}")
 
 
 if __name__ == "__main__":
+    # Manuelles Training per:
+    #   python3 train_from_logs
     train_model_from_all_data()

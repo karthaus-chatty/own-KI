@@ -191,6 +191,8 @@
       justify-content: space-between;
       gap: 8px;
       margin-bottom: 6px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 6px;
     }
 
     .card-title {
@@ -335,41 +337,19 @@
       margin-left: 8px;
       color: var(--text-muted);
     }
-/* ===== Bessere Abgrenzung im Darkmode (Admin) ===== */
 
-  :root[data-theme="dark"] .content {
-    border-top: 1px solid #111827;
-  }
+    .profile-info {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(15, 23, 42, 0.04);
+    }
 
-  :root[data-theme="dark"] .card {
-    background: radial-gradient(circle at top left, #0b1120 0, #020617 60%);
-    border-color: #374151;
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
-  }
-
-  .card + .card {
-    margin-top: 12px;
-  }
-
-  .card-header {
-    border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 6px;
-    margin-bottom: 10px;
-  }
-
-  .profile-info {
-    font-size: 12px;
-    color: var(--text-muted);
-    padding: 4px 8px;
-    border-radius: 999px;
-    border: 1px solid var(--border-subtle);
-    background: rgba(15, 23, 42, 0.04);
-  }
-
-  :root[data-theme="dark"] .profile-info {
-    background: rgba(15, 23, 42, 0.7);
-  }
-
+    :root[data-theme="dark"] .profile-info {
+      background: rgba(15, 23, 42, 0.7);
+    }
   </style>
 </head>
 <body>
@@ -384,7 +364,7 @@
           </div>
         </div>
         <div class="header-right">
-          <span class="badge-env">Admin-Area • lokal</span>
+          <span class="badge-env">Admin-Area • lokal/remote</span>
           <span class="profile-info">
             Eingeloggt als <strong>{{ username }}</strong>
           </span>
@@ -404,11 +384,23 @@
               <div class="card-subtitle">Training & Datenpflege</div>
             </div>
           </div>
-          <p>
+          <p style="margin-bottom:4px;">
             <button id="export-unknowns-btn">
               Unknown-Intents exportieren
             </button>
             <span id="export-unknowns-status" class="status-text"></span>
+          </p>
+          <p class="small-muted" style="margin:4px 0 10px;">
+            {% if not no_logs and intents %}
+              {% if intents.unknown_count %}
+                Aktuell in den Logs: <strong>{{ intents.unknown_count }}</strong> Unknown-Intents
+                ({{ intents.unknown_percent|round(1) }}%), die nach <code>data/unknowns.csv</code> exportiert werden können.
+              {% else %}
+                In den Logs sind derzeit keine Unknown-Intents vorhanden.
+              {% endif %}
+            {% else %}
+              Noch keine Logs vorhanden – schreibe zuerst ein paar Nachrichten im Chat, bevor du Unknowns exportierst.
+            {% endif %}
           </p>
           <p>
             <button id="train-model-btn" class="btn-success">
@@ -417,8 +409,8 @@
             <span id="train-model-status" class="status-text"></span>
           </p>
           <p class="small-muted" style="margin-top: 8px;">
-            Training nutzt Basisdaten + Logs + gelabelte Unknowns aus
-            <code>data/unknowns.csv</code>.
+            Training nutzt Basisdaten, <code>data/training_data.json</code>, geloggte Intents aus
+            <code>data/chatlog.csv</code> sowie (falls gelabelt) Daten aus <code>data/unknowns.csv</code>.
           </p>
         </div>
 
