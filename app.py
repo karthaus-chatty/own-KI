@@ -96,12 +96,15 @@ def requires_auth(f):
 def is_logged_in() -> bool:
     return bool(session.get("logged_in"))
 
-def login_user():
+def login_user(username: str):
     session["logged_in"] = True
+    session["username"] = username
+
 
 def logout_user():
     session.pop("logged_in", None)
     session.pop("history", None)  # optional: History löschen beim Logout
+    session.pop("username", None)
 
 def requires_login(view_func):
     @wraps(view_func)
@@ -139,7 +142,7 @@ def login():
         password = (request.form.get("password") or "").strip()
 
         if username == APP_USER and password == APP_PASSWORD:
-            login_user()
+            login_user(username)
             return redirect("/")  # nach erfolgreichem Login zum Chat
         else:
             return render_template("login.html", error="Falscher Benutzername oder Passwort."), 401
@@ -156,7 +159,8 @@ def logout():
 @app.route("/")
 @requires_login
 def index():
-    return render_template("index.html")
+    username = session.get("username", "")
+    return render_template("index.html", username=username)
 
 
 @app.route("/api/chat", methods=["POST"])
@@ -213,14 +217,15 @@ def admin_dashboard():
     rows = load_logs()
     if not rows:
         return render_template(
-            "admin.html",
-            no_logs=True,
-            basic=None,
-            intents=None,
-            per_day=None,
-            examples=None,
-            top_overall=None,
-            top_per_intent=None,
+        "admin.html",
+        no_logs=True,
+        basic=None,
+        intents=None,
+        per_day=None,
+        examples=None,
+        top_overall=None,
+        top_per_intent=None,
+        username=session.get("username", ""),
         )
 
     basic = compute_basic_stats(rows)
@@ -274,5 +279,8 @@ def admin_train():
 
 
 if __name__ == "__main__":
-    print("[DEBUG] Starte Voll-Flask-App auf http://0.0.0.0:5000")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    import os
+
+    port = int(os.getenv("PORT", 5000))
+    print(f"[DEBUG] Starte Voll-Flask-App auf http://0.0.0.0:{port}")
+    app.run(debug=False, host="0.0.0.0", port=port)
