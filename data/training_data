@@ -1,0 +1,91 @@
+{
+  "data": [
+    { "text": "Hallo", "intent": "greeting" },
+    { "text": "Hi", "intent": "greeting" },
+    { "text": "Guten Morgen", "intent": "greeting" },
+    { "text": "Guten Abend", "intent": "greeting" },
+    { "text": "Moin", "intent": "greeting" },
+    { "text": "Na, alles klar?", "intent": "greeting" },
+    { "text": "Servus", "intent": "greeting" },
+    { "text": "Hey, was geht", "intent": "greeting" },
+
+    { "text": "Tschüss", "intent": "goodbye" },
+    { "text": "Bis später", "intent": "goodbye" },
+    { "text": "Bis morgen", "intent": "goodbye" },
+    { "text": "Mach's gut", "intent": "goodbye" },
+    { "text": "Schönen Abend noch", "intent": "goodbye" },
+    { "text": "Ich bin dann mal weg", "intent": "goodbye" },
+
+    { "text": "Danke", "intent": "thanks" },
+    { "text": "Vielen Dank", "intent": "thanks" },
+    { "text": "Danke dir", "intent": "thanks" },
+    { "text": "Super, danke für deine Hilfe", "intent": "thanks" },
+    { "text": "Perfekt, danke", "intent": "thanks" },
+
+    { "text": "Was kannst du eigentlich?", "intent": "meta_bot" },
+    { "text": "Wer bist du?", "intent": "meta_bot" },
+    { "text": "Wie funktionierst du?", "intent": "meta_bot" },
+    { "text": "Bist du eine KI?", "intent": "meta_bot" },
+    { "text": "Was ist deine Aufgabe?", "intent": "meta_bot" },
+
+    { "text": "Was ist künstliche Intelligenz?", "intent": "ki_general" },
+    { "text": "Erklär mir KI", "intent": "ki_general" },
+    { "text": "Was sind typische Einsatzgebiete von KI?", "intent": "ki_general" },
+    { "text": "Was ist der Unterschied zwischen KI und Machine Learning?", "intent": "ki_general" },
+    { "text": "Was sind neuronale Netze?", "intent": "ki_general" },
+
+    { "text": "Wie trainiert man eine KI?", "intent": "ki_training" },
+    { "text": "Was sind Trainingsdaten?", "intent": "ki_training" },
+    { "text": "Was bedeutet Overfitting?", "intent": "ki_training" },
+    { "text": "Was ist eine Konfusionsmatrix?", "intent": "ki_training" },
+    { "text": "Wie teile ich meine Daten in Train und Test?", "intent": "ki_training" },
+
+    { "text": "Wie programmiere ich meine eigene KI?", "intent": "ki_programming" },
+    { "text": "Wie baue ich eine Intent-Erkennung?", "intent": "ki_programming" },
+    { "text": "Wie implementiere ich einen Textklassifikator mit scikit-learn?", "intent": "ki_programming" },
+    { "text": "Wie kombiniere ich TF-IDF und Logistic Regression?", "intent": "ki_programming" },
+    { "text": "Wie mache ich aus meinem Modell einen Chatbot?", "intent": "ki_programming" },
+
+    { "text": "Wie installiere ich ein Paket mit pip?", "intent": "python_help" },
+    { "text": "Was ist der Unterschied zwischen Liste und Tuple?", "intent": "python_help" },
+    { "text": "Wie lese ich eine CSV-Datei in Python ein?", "intent": "python_help" },
+    { "text": "Wie erstelle ich eine virtuelle Umgebung in Python?", "intent": "python_help" },
+    { "text": "Was bedeutet der Traceback in Python?", "intent": "python_help" },
+
+    { "text": "Was hältst du von Dubstep?", "intent": "music" },
+    { "text": "Empfiehl mir Metal-Bands", "intent": "music" },
+    { "text": "Welche Musik passt zum Programmieren?", "intent": "music" },
+    { "text": "Kennst du gute EDM-Künstler?", "intent": "music" },
+    { "text": "Welche Musik eignet sich zum Sport?", "intent": "music" },
+
+    { "text": "Wie geht's dir?", "intent": "smalltalk" },
+    { "text": "Mir ist langweilig, reden wir ein bisschen", "intent": "smalltalk" },
+    { "text": "Erzähl mir etwas Lustiges", "intent": "smalltalk" },
+    { "text": "Lass uns ein bisschen quatschen", "intent": "smalltalk" },
+    { "text": "Ich brauch kurz Pause, plaudern wir", "intent": "smalltalk" },
+
+    { "text": "Ich bin gestresst von der Arbeit", "intent": "work" },
+    { "text": "Mein Job stresst mich gerade", "intent": "work" },
+    { "text": "Im Büro ist gerade viel los", "intent": "work" },
+    { "text": "Ich habe zu viele Aufgaben im Job", "intent": "work" },
+    { "text": "Ich weiß nicht, wie ich meine Arbeit organisieren soll", "intent": "work" },
+    { "text": "Mein neuer Arbeitsplatz ist ganz schön intensiv", "intent": "work" },
+    { "text": "Ich komme mit meinem Arbeitspensum nicht hinterher", "intent": "work" },
+
+    { "text": "Mir geht es heute nicht so gut", "intent": "feelings" },
+    { "text": "Ich bin müde und ausgelaugt", "intent": "feelings" },
+    { "text": "Ich fühle mich überfordert", "intent": "feelings" },
+    { "text": "Ich bin gerade voll motiviert", "intent": "feelings" },
+    { "text": "Ich bin etwas nervös wegen der Arbeit", "intent": "feelings" },
+    { "text": "Ich bin gerade ein bisschen down", "intent": "feelings" },
+    { "text": "Ich bin total happy im Moment", "intent": "feelings" },
+
+    { "text": "Ich komme mit einer Kollegin richtig gut klar", "intent": "personal_relations" },
+    { "text": "Ich habe ein bisschen Herzklopfen wegen einer Person auf der Arbeit", "intent": "personal_relations" },
+    { "text": "Da ist jemand im Büro, den ich sehr mag", "intent": "personal_relations" },
+    { "text": "Die Situation mit einer Kollegin ist kompliziert", "intent": "personal_relations" },
+    { "text": "Ich bin mir unsicher, wie ich mich bei einer bestimmten Person verhalten soll", "intent": "personal_relations" },
+    { "text": "Ich habe Gefühle für jemanden und weiß nicht, wie ich damit umgehen soll", "intent": "personal_relations" },
+    { "text": "Zwischen mir und einer Person knistert es ein bisschen", "intent": "personal_relations" }
+  ]
+}

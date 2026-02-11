@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chatbot UI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+
+    /* ===== Theme-Variablen ===== */
+
+    :root[data-theme="dark"] {
+      --bg-body: radial-gradient(circle at top, #111827 0, #020617 45%, #000 100%);
+      --bg-card: #020617;
+      --bg-header: linear-gradient(90deg, #020617, #0b1120);
+      --border-subtle: #1f2937;
+      --accent: #6366f1;
+      --accent-soft: rgba(99, 102, 241, 0.12);
+      --accent-green: #16a34a;
+      --accent-red: #f97316;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --badge-bg: rgba(15, 23, 42, 0.9);
+      --input-bg: #020617;
+      --bubble-bot-bg: rgba(15, 23, 42, 0.95);
+      --shadow-card: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    :root[data-theme="light"] {
+      --bg-body: radial-gradient(circle at top, #ffffff 0, #f3f4f6 45%, #e5e7eb 100%);
+      --bg-card: #ffffff;
+      --bg-header: linear-gradient(90deg, #e5e7eb, #d1d5db);
+      --border-subtle: #d1d5db;
+      --accent: #4f46e5;
+      --accent-soft: rgba(79, 70, 229, 0.08);
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --text-main: #111827;
+      --text-muted: #4b5563;
+      --badge-bg: rgba(243, 244, 246, 0.9);
+      --input-bg: #f9fafb;
+      --bubble-bot-bg: #f9fafb;
+      --shadow-card: 0 8px 18px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg-body);
+      color: var(--text-main);
+      transition: background 0.25s ease, color 0.25s ease;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-header);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-pill {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, #22d3ee, #6366f1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+      color: #020617;
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.6);
+    }
+
+    .title-main {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .title-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .link-admin {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      backdrop-filter: blur(12px);
+      background: rgba(15, 23, 42, 0.04);
+    }
+
+    :root[data-theme="light"] .link-admin {
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    .link-admin:hover {
+      border-color: var(--accent);
+      color: var(--text-main);
+    }
+
+    .badge-env {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--badge-bg);
+    }
+
+    .theme-toggle {
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      padding: 6px 10px;
+      font-size: 12px;
+      background: var(--badge-bg);
+      color: var(--text-main);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .content {
+      flex: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px 16px 24px;
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(260px, 1.1fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .content {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      padding: 14px 14px 12px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .card-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      font-size: 11px;
+      background: rgba(15, 23, 42, 0.05);
+    }
+
+    :root[data-theme="dark"] .pill {
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    .pill-live {
+      border-color: var(--accent-green);
+      background: rgba(34, 197, 94, 0.12);
+      color: #14532d;
+    }
+
+    :root[data-theme="dark"] .pill-live {
+      color: #bbf7d0;
+    }
+
+    .pill-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent-green);
+      box-shadow: 0 0 6px rgba(34, 197, 94, 0.9);
+    }
+
+    .chat-shell {
+      display: flex;
+      flex-direction: column;
+      height: 70vh;
+      max-height: 600px;
+      min-height: 420px;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scroll-behavior: smooth;
+    }
+
+    .chat-footer {
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .chat-input {
+      flex: 1;
+      border-radius: 999px;
+      border: 1px solid #cbd5f5;
+      background: var(--input-bg);
+      color: var(--text-main);
+      padding: 9px 14px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    :root[data-theme="dark"] .chat-input {
+      border-color: #374151;
+    }
+
+    .chat-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-soft);
+    }
+
+    .chat-send-btn {
+      border-radius: 999px;
+      border: 1px solid var(--accent-green);
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      background: linear-gradient(135deg, #16a34a, #22c55e);
+      color: #020617;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .chat-send-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .chat-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .msg-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .msg-row.user {
+      justify-content: flex-end;
+    }
+
+    .msg-bubble {
+      max-width: 80%;
+      padding: 8px 11px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      position: relative;
+    }
+
+    .msg-bubble.user {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      align-self: flex-end;
+      color: #e5e7eb;
+    }
+
+    .msg-bubble.bot {
+      background: var(--bubble-bot-bg);
+      border: 1px solid var(--border-subtle);
+      align-self: flex-start;
+    }
+
+    .msg-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .typing-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--text-muted);
+      animation: blink 1s infinite ease-in-out;
+    }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes blink {
+      0%, 80%, 100% { opacity: 0.2; transform: translateY(0); }
+      40% { opacity: 1; transform: translateY(-1px); }
+    }
+
+    .side-card-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .intent-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      font-size: 11px;
+      margin: 0 4px 4px 0;
+      background: rgba(15, 23, 42, 0.04);
+      color: var(--text-main);
+    }
+
+    :root[data-theme="dark"] .intent-badge {
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    .intent-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+      margin-right: 4px;
+    }
+
+    .info-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    ul {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      font-size: 13px;
+      color: var(--text-main);
+    }
+
+    /* ===== Bessere Abgrenzung im Darkmode (Chat) ===== */
+
+  :root[data-theme="dark"] .content {
+    border-top: 1px solid #111827;
+  }
+
+  :root[data-theme="dark"] .card {
+    background: radial-gradient(circle at top left, #0b1120 0, #020617 60%);
+    border-color: #374151;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.85);
+  }
+
+  .card + .card {
+    margin-top: 12px;
+  }
+
+  .card-header {
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+  }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="header">
+      <div class="header-inner">
+        <div class="header-left">
+          <div class="logo-pill">C</div>
+          <div>
+            <div class="title-main">Chatbot</div>
+            <div class="title-sub">Dein lokaler KI-Chatbot mit Intent-Training</div>
+          </div>
+        </div>
+        <div class="header-right">
+          <span class="badge-env">Lokal • Flask</span>
+          <button id="theme-toggle" class="theme-toggle" type="button">🌙 Dunkel</button>
+          <a href="/admin" class="link-admin">Admin-Dashboard →</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Konversation</div>
+            <div class="card-subtitle">Logs & Training laufen im Hintergrund mit</div>
+          </div>
+          <span class="pill pill-live">
+            <span class="pill-dot"></span> Live
+          </span>
+        </div>
+        <div class="chat-shell">
+          <div id="chat-messages" class="chat-messages">
+            <div class="msg-row bot">
+              <div class="msg-bubble bot">
+                Hey 👋 Ich bin dein lokaler KI-Chatbot. Frag mich was zu KI, Python, Musik oder einfach so.
+                <div class="msg-meta">Intent: greeting • Confidence: 100%</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-footer">
+            <form id="chat-form">
+              <div class="input-row">
+                <input
+                  id="chat-input"
+                  class="chat-input"
+                  type="text"
+                  placeholder="Schreib eine Nachricht und drück Enter…"
+                  autocomplete="off"
+                />
+                <button type="submit" class="chat-send-btn" id="chat-send-btn">
+                  <span>Senden</span>
+                </button>
+              </div>
+            </form>
+            <div class="chat-hint">
+              Nachrichten werden in <code>data/chatlog.csv</code> geloggt und können im Admin-Dashboard analysiert werden.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Bekannte Intents</div>
+          </div>
+          <div>
+            <div id="intent-list" class="side-card-sub">
+              Werden geladen…
+            </div>
+            <div id="intent-badges"></div>
+            <p class="info-text">
+              Diese Intents werden vom Modell vorhergesagt. Neue Daten aus Unknowns kannst du im Admin-Dashboard einfließen lassen.
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Tipps</div>
+          </div>
+          <ul>
+            <li>Schreib bewusst Sätze, die der Bot nicht versteht – sie landen als <code>unknown</code> im Log.</li>
+            <li>Unknowns exportieren, labeln, Modell neu trainieren → dein Bot wird besser.</li>
+            <li>Nach dem Training die App neu starten, damit das neue Modell geladen wird.</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // === Theme Toggle ===
+    (function () {
+      const root = document.documentElement;
+      const btn = document.getElementById("theme-toggle");
+
+      function applyTheme(theme) {
+        root.setAttribute("data-theme", theme);
+        if (theme === "dark") {
+          btn.textContent = "☀︎ Hell";
+        } else {
+          btn.textContent = "🌙 Dunkel";
+        }
+      }
+
+      function initTheme() {
+        const stored = localStorage.getItem("chat_theme");
+        if (stored === "dark" || stored === "light") {
+          applyTheme(stored);
+          return;
+        }
+        const prefersDark = window.matchMedia &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches;
+        applyTheme(prefersDark ? "dark" : "light");
+      }
+
+      btn.addEventListener("click", () => {
+        const current = root.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        const next = current === "dark" ? "light" : "dark";
+        applyTheme(next);
+        localStorage.setItem("chat_theme", next);
+      });
+
+      initTheme();
+    })();
+
+    // === Chat-Logik ===
+    const form = document.getElementById("chat-form");
+    const input = document.getElementById("chat-input");
+    const messages = document.getElementById("chat-messages");
+    const sendBtn = document.getElementById("chat-send-btn");
+
+    const intentListText = document.getElementById("intent-list");
+    const intentBadges = document.getElementById("intent-badges");
+
+    let isTypingVisible = false;
+    let typingRow = null;
+
+    function appendMessage(text, who, intent, confidence) {
+      if (isTypingVisible) {
+        removeTypingIndicator();
+      }
+
+      const row = document.createElement("div");
+      row.classList.add("msg-row", who);
+
+      const bubble = document.createElement("div");
+      bubble.classList.add("msg-bubble", who === "user" ? "user" : "bot");
+      bubble.textContent = text;
+
+      if (who === "bot" && intent) {
+        const meta = document.createElement("div");
+        meta.classList.add("msg-meta");
+        let msg = "Intent: " + intent;
+        if (typeof confidence === "number") {
+          const pct = Math.round(confidence * 100);
+          msg += " • Confidence: " + pct + "%";
+        }
+        meta.textContent = msg;
+        bubble.appendChild(meta);
+      }
+
+      row.appendChild(bubble);
+      messages.appendChild(row);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function showTypingIndicator() {
+      if (isTypingVisible) return;
+      isTypingVisible = true;
+
+      typingRow = document.createElement("div");
+      typingRow.classList.add("msg-row", "bot");
+
+      const bubble = document.createElement("div");
+      bubble.classList.add("msg-bubble", "bot");
+
+      const indicator = document.createElement("div");
+      indicator.classList.add("typing-indicator");
+      indicator.innerHTML = `
+        <span>Bot schreibt</span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      `;
+
+      bubble.appendChild(indicator);
+      typingRow.appendChild(bubble);
+      messages.appendChild(typingRow);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+      isTypingVisible = false;
+      if (typingRow && typingRow.parentNode) {
+        typingRow.parentNode.removeChild(typingRow);
+      }
+      typingRow = null;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      appendMessage(text, "user");
+      input.value = "";
+      input.focus();
+
+      sendBtn.disabled = true;
+      showTypingIndicator();
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message: text }),
+        });
+
+        if (!res.ok) {
+          removeTypingIndicator();
+          appendMessage("Fehler beim Senden 😢", "bot");
+        } else {
+          const data = await res.json();
+          removeTypingIndicator();
+          if (data.error) {
+            appendMessage("Fehler: " + data.error, "bot");
+          } else {
+            appendMessage(data.answer, "bot", data.intent, data.confidence);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        removeTypingIndicator();
+        appendMessage("Netzwerkfehler 😢", "bot");
+      } finally {
+        sendBtn.disabled = false;
+      }
+    });
+
+    async function loadIntents() {
+      try {
+        const res = await fetch("/api/intents");
+        if (!res.ok) {
+          intentListText.textContent = "Fehler beim Laden der Intents.";
+          return;
+        }
+        const data = await res.json();
+        const intents = data.intents || [];
+        if (!intents.length) {
+          intentListText.textContent = "Keine Intents gefunden.";
+          return;
+        }
+        intentListText.textContent = "Aktuell bekannte Intents:";
+        intentBadges.innerHTML = "";
+        intents.forEach((intent) => {
+          const span = document.createElement("span");
+          span.classList.add("intent-badge");
+          span.innerHTML = `<span class="intent-dot"></span>${intent}`;
+          intentBadges.appendChild(span);
+        });
+      } catch (err) {
+        console.error(err);
+        intentListText.textContent = "Netzwerkfehler beim Laden der Intents.";
+      }
+    }
+
+    loadIntents();
+  </script>
+</body>
+</html>

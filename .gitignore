@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtualenvs
+venv/
+.venv/
+env/
+
+# macOS
+.DS_Store
+
+# Daten & Modelle
+data/*.csv
+data/*.pkl
+data/model.pkl
+data/vectorizer.pkl
+
+# Sonstiges
+*.log
