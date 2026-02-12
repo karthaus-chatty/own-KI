@@ -340,8 +340,18 @@
     .btn-success {
       border-color: var(--accent-green);
       background: linear-gradient(135deg, #16a34a, #22c55e);
-      color: #020617;
+      color: #ffffff;              /* <- immer gut lesbar */
+      font-weight: 700;            /* <- stärker */
+      text-shadow: 0 1px 1px rgba(0,0,0,0.35);  /* <- Kontrast auf hellen Verläufen */
     }
+
+.btn-success:hover {
+  filter: brightness(1.03);
+}
+
+.btn-success:active {
+  filter: brightness(0.98);
+}
 
     .status-text {
       font-size: 12px;
