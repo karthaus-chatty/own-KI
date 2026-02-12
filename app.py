@@ -31,7 +31,7 @@ from chatbot import (
     tweak_answer_with_context,
     debug_intent_analysis,
     get_intent_example_counts,
-    #find_similar_examples,
+    find_similar_examples,
 )
 from analyze_logs import (
     load_logs,
@@ -861,42 +861,93 @@ def api_chat():
     )
 def get_training_examples_for_similarity() -> List[Dict[str, str]]:
     """
-    Liefert eine Liste von Trainingsbeispielen für Similarity-Suche.
-    Quelle:
-    - base_train_data (Code-basis)
-    - data/training_data.json (manuell gelabelt im Admin)
-
-    Struktur je Eintrag:
-    { "text": "...", "intent": "..." }
+    Beispiele für Similarity-Suche aus:
+    - base_train_data
+    - training_data.json
+    - chatlog.csv (nur bekannte Intents, kein unknown)
     """
     examples: List[Dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
 
-    # Basisdaten aus dem Code
-    for text, intent in base_train_data:
+    def add_example(text: str, intent: str):
         t = (text or "").strip()
         i = (intent or "").strip()
         if not t or not i:
-            continue
+            return
+        key = (t, i)
+        if key in seen:
+            return
+        seen.add(key)
         examples.append({"text": t, "intent": i})
 
-    # Zusätzliche Daten aus training_data.json
+    # base_train_data (muss bei dir existieren)
+    for text, intent in base_train_data:
+        add_example(text, intent)
+
+    # training_data.json
     if os.path.exists(TRAINING_JSON):
         try:
             with open(TRAINING_JSON, "r", encoding="utf-8") as f:
                 payload = json.load(f) or {}
             for item in payload.get("data", []):
-                t = (item.get("text") or "").strip()
-                i = (item.get("intent") or "").strip()
-                if not t or not i:
-                    continue
-                examples.append({"text": t, "intent": i})
+                add_example(item.get("text") or "", item.get("intent") or "")
         except Exception as e:
             print(f"[similarity] Konnte training_data.json nicht lesen: {e}")
 
-    # Du könntest hier optional auch gelabelte Logs ergänzen.
-    # Für den Anfang reicht Basis + JSON meist völlig.
+    # chatlog.csv
+    if os.path.exists(LOG_FILE):
+        try:
+            with open(LOG_FILE, "r", encoding="utf-8", newline="") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    t = (row.get("user_text") or "").strip()
+                    i = (row.get("intent") or "").strip()
+                    if not t or not i:
+                        continue
+                    if i == UNKNOWN_INTENT:
+                        continue
+                    add_example(t, i)
+        except Exception as e:
+            print(f"[similarity] Konnte chatlog.csv nicht lesen: {e}")
 
     return examples
+
+
+def find_similar_examples(user_text: str, top_n: int = 5) -> List[Dict[str, Any]]:
+    """
+    Top-N ähnliche Beispiele im TF-IDF Raum (über den bestehenden vectorizer).
+    """
+    user_text = (user_text or "").strip()
+    if not user_text:
+        return []
+
+    examples = get_training_examples_for_similarity()
+    if not examples:
+        return []
+
+    vectorizer, model = load_model()
+    corpus_texts = [e["text"] for e in examples]
+
+    X = vectorizer.transform([user_text] + corpus_texts)
+    q_vec = X[0:1]
+    corpus_vecs = X[1:]
+
+    sims = cosine_similarity(q_vec, corpus_vecs)[0]
+    indexed = list(enumerate(sims))
+    indexed.sort(key=lambda x: x[1], reverse=True)
+
+    results: List[Dict[str, Any]] = []
+    for idx, score in indexed[:top_n]:
+        ex = examples[idx]
+        results.append(
+            {
+                "text": ex["text"],
+                "intent": ex["intent"],
+                "similarity": float(score),
+            }
+        )
+
+    return results
 
 
 def find_similar_examples(user_text: str, top_n: int = 5) -> List[Dict[str, Any]]:
