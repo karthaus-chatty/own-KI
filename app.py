@@ -31,7 +31,7 @@ from chatbot import (
     tweak_answer_with_context,
     debug_intent_analysis,
     get_intent_example_counts,
-    find_similar_examples,
+    #find_similar_examples,
 )
 from analyze_logs import (
     load_logs,
